@@ -990,6 +990,53 @@ PAR_ERROR CSBIGCam::GrabMain(CSBIGImg *pImg, SBIG_DARK_FRAME dark)
 	return CE_NO_ERROR;	
 }
 
+PAR_ERROR CSBIGCam::Readout(CSBIGImg *pImg, SBIG_DARK_FRAME dark)
+{
+	int 				i;
+	PAR_ERROR 			err;
+	StartReadoutParams 	srp;
+	ReadoutLineParams 	rlp;
+
+	// readout the CCD
+	srp.ccd    = m_eActiveCCD;
+	srp.left   = m_sGrabInfo.left;
+	srp.top    = m_sGrabInfo.top;
+	srp.height = m_sGrabInfo.height;
+	srp.width  = m_sGrabInfo.width;
+	srp.readoutMode = m_uReadoutMode;
+	m_eGrabState = (dark == SBDF_LIGHT_ONLY ? GS_DIGITIZING_LIGHT : GS_DIGITIZING_DARK);
+
+	if ( (err = StartReadout(srp)) == CE_NO_ERROR )
+	{
+		rlp.ccd = m_eActiveCCD;
+		rlp.pixelStart = m_sGrabInfo.left;
+		rlp.pixelLength = m_sGrabInfo.width;
+		rlp.readoutMode = m_uReadoutMode;
+
+		for (i = 0; i < m_sGrabInfo.height && err == CE_NO_ERROR; i++)
+		{
+			m_dGrabPercent = (double)(i+1) / m_sGrabInfo.height;
+			err = ReadoutLine(rlp, FALSE, pImg->GetImagePointer() + (long)i * m_sGrabInfo.width);
+		}
+	}
+
+	EndReadout();
+
+	if (err != CE_NO_ERROR)
+	{
+		return err;
+	}
+
+	if (m_eLastError != CE_NO_ERROR)
+	{
+		return err;
+	}
+
+	// set the note to the local time
+	m_eGrabState = GS_DUSK;
+	return CE_NO_ERROR;
+}
+
 /*
   
  GrabImage:
@@ -1885,4 +1932,3 @@ PAR_ERROR CSBIGCam::GetFormattedCameraInfo(string &ciStr, MY_LOGICAL htmlFormat 
 		ciStr += "</TABLE>";
 	return m_eLastError = res;
 }
-

@@ -169,6 +169,9 @@ public:
 	PAR_ERROR GrabImage(CSBIGImg *pImg, SBIG_DARK_FRAME dark);
 	void 	  GetGrabState(GRAB_STATE &grabState, double &percentComplete);
 
+	// used by pytel
+	PAR_ERROR Readout(CSBIGImg *pImg, SBIG_DARK_FRAME dark);
+
 	// Low-Level Exposure Related Commands
 	PAR_ERROR StartExposure(SHUTTER_COMMAND shutterState);
 	PAR_ERROR EndExposure(void);

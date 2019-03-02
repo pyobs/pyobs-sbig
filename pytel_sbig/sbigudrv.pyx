@@ -1,4 +1,5 @@
 # distutils: language = c++
+import time
 
 import numpy as np
 cimport numpy as np
@@ -28,7 +29,7 @@ cdef class SBIGImg:
 
         # create a C array to describe the shape of the ndarray
         cdef np.npy_intp shape[1]
-        shape[0] = <np.npy_intp>(width * height)
+        shape[0] = <np.npy_intp>(int(width * height))
 
         # Use the PyArray_SimpleNewFromData function from numpy to create a
         # new Python object pointing to the existing data
@@ -148,8 +149,11 @@ cdef class SBIGCam:
         # return it
         return enabled == 1, temp, setpoint, power
 
-    def grab_image(self, img: SBIGImg, shutter: bool):
-        # set mode
+    def expose(self, img: SBIGImg, shutter: bool):
+        # define vars
+        cdef MY_LOGICAL complete = 0
+
+        # get mode
         mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
 
         # do setup
@@ -157,7 +161,39 @@ cdef class SBIGCam:
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
 
-        # do exposure
-        res = self.obj.GrabMain(img.obj, mode)
+        # end current exposure, if any
+        res = self.obj.EndExposure()
+        if res != 0:
+            raise ValueError(self.obj.GetErrorString(res))
+
+        # start exposure
+        shutter_cmd = SHUTTER_COMMAND.SC_OPEN_SHUTTER if shutter else  SHUTTER_COMMAND.SC_CLOSE_SHUTTER
+        res = self.obj.StartExposure(shutter_cmd)
+        if res != 0:
+            raise ValueError(self.obj.GetErrorString(res))
+
+        # wait for exposure
+        while True:
+            # is complete?
+            res = self.obj.IsExposureComplete(complete)
+
+            # break on error or if complete
+            if res != 0  or complete:
+                break
+
+            # sleep a little
+            time.sleep(0.1)
+
+        # end exposure
+        res = self.obj.EndExposure()
+        if res != 0:
+            raise ValueError(self.obj.GetErrorString(res))
+
+    def readout(self, img: SBIGImg, shutter: bool):
+        # get mode
+        mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
+
+        # do readout
+        res = self.obj.Readout(img.obj, mode)
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))

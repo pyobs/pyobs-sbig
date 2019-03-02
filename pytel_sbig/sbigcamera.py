@@ -85,19 +85,28 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # init image
         self._img.image_can_close = False
 
-        # take exposure
+        # do exposure
         try:
-            self._cam.grab_image(self._img, open_shutter)
+            # start exposure
+            self._cam.expose(self._img, open_shutter)
         except ValueError as e:
             log.error('Could not take image: %s', e)
+            return None
+
+        # wait for readout
+        log.info('Exposure finished, reading out...')
+        self._camera_status = ICamera.CameraStatus.READOUT
+        try:
+            # start readout
+            self._cam.readout(self._img, open_shutter)
+        except ValueError as e:
+            log.error('Could not read out image: %s', e)
             return None
 
         # finalize image
         self._img.image_can_close = True
 
         # download data
-        log.info('Exposure finished, reading out...')
-        self._camera_status = ICamera.CameraStatus.READOUT
         data = self._img.data
 
         # temp & cooling

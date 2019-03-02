@@ -117,6 +117,10 @@ cdef extern from "../src/csbigcam.h":
     ctypedef enum SBIG_DARK_FRAME:
         SBDF_LIGHT_ONLY, SBDF_DARK_ONLY, SBDF_DARK_ALSO
 
+    ctypedef enum SHUTTER_COMMAND:
+        SC_LEAVE_SHUTTER, SC_OPEN_SHUTTER, SC_CLOSE_SHUTTER, SC_INITIALIZE_SHUTTER, \
+            SC_OPEN_EXT_SHUTTER, SC_CLOSE_EXT_SHUTTER
+
     cdef cppclass CSBIGCam:
         CSBIGCam(int type)
 
@@ -153,11 +157,12 @@ cdef extern from "../src/csbigcam.h":
         PAR_ERROR GrabMain (CSBIGImg *pImg, SBIG_DARK_FRAME dark)
         PAR_ERROR GrabImage(CSBIGImg *pImg, SBIG_DARK_FRAME dark)
         #void 	  GetGrabState(GRAB_STATE &grabState, double &percentComplete)
+        PAR_ERROR Readout  (CSBIGImg *pImg, SBIG_DARK_FRAME dark)
 
         # Low-Level Exposure Related Commands
-        #PAR_ERROR StartExposure(SHUTTER_COMMAND shutterState)
+        PAR_ERROR StartExposure(SHUTTER_COMMAND shutterState)
         PAR_ERROR EndExposure()
-        #PAR_ERROR IsExposureComplete(MY_LOGICAL &complete)
+        PAR_ERROR IsExposureComplete(MY_LOGICAL &complete)
         #PAR_ERROR StartReadout(StartReadoutParams srp)
         PAR_ERROR EndReadout()
         #PAR_ERROR ReadoutLine(ReadoutLineParams rlp, MY_LOGICAL darkSubtract, unsigned short *dest)
