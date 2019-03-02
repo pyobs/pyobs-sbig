@@ -1,0 +1,4 @@
+pytel
+cython
+numpy
+astropy
