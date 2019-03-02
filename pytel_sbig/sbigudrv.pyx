@@ -29,11 +29,11 @@ cdef class SBIGImg:
 
         # create a C array to describe the shape of the ndarray
         cdef np.npy_intp shape[1]
-        shape[0] = <np.npy_intp>(int(width * height))
+        shape[0] = <np.npy_intp>(width * height)
 
         # Use the PyArray_SimpleNewFromData function from numpy to create a
         # new Python object pointing to the existing data
-        arr = np.PyArray_SimpleNewFromData(1, shape, np.ushort, <void *>self.obj.GetImagePointer())
+        arr = np.PyArray_SimpleNewFromData(1, shape, np.NPY_USHORT, <void *>self.obj.GetImagePointer())
 
         # reshape it
         return arr.reshape((height, width))
