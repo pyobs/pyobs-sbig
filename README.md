@@ -42,6 +42,8 @@ The class works fine with its default parameters, so a basic module configuratio
 
 Dependencies
 ------------
+* **pytel** for the core funcionality. It is not included in the *requirements.txt*, so needs to be installed 
+  separately.
 * [Cython](https://cython.org/) for wrapping the SBIG Universal Driver.
 * [Astropy](http://www.astropy.org/) for FITS file handling.
 * [NumPy](http://www.numpy.org/) for array handling.

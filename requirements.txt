@@ -1,4 +1,3 @@
-pytel
 cython
 numpy
 astropy
