@@ -1,5 +1,4 @@
 from distutils.core import setup, Extension
-import os
 from Cython.Build import cythonize
 
 extensions = [
