@@ -1,4 +1,6 @@
 from libcpp.string cimport string
+from enum import Enum
+
 
 cdef extern from "../src/csbigimg.h":
     ctypedef unsigned short MY_LOGICAL
@@ -121,6 +123,22 @@ cdef extern from "../src/csbigcam.h":
         SC_LEAVE_SHUTTER, SC_OPEN_SHUTTER, SC_CLOSE_SHUTTER, SC_INITIALIZE_SHUTTER, \
             SC_OPEN_EXT_SHUTTER, SC_CLOSE_EXT_SHUTTER
 
+    ctypedef enum CFW_MODEL_SELECT:
+        CFWSEL_UNKNOWN, CFWSEL_CFW2, CFWSEL_CFW5, CFWSEL_CFW8, CFWSEL_CFWL, CFWSEL_CFW402, CFWSEL_AUTO, CFWSEL_CFW6A, \
+        CFWSEL_CFW10, CFWSEL_CFW10_SERIAL, CFWSEL_CFW9, CFWSEL_CFWL8, CFWSEL_CFWL8G, CFWSEL_CFW1603, \
+        CFWSEL_FW5_STX, CFWSEL_FW5_8300, CFWSEL_FW8_8300, CFWSEL_FW7_STX, CFWSEL_FW8_STT
+
+    ctypedef enum CFW_POSITION:
+        CFWP_UNKNOWN, CFWP_1, CFWP_2, CFWP_3, CFWP_4, CFWP_5, CFWP_6, CFWP_7, CFWP_8, CFWP_9, CFWP_10
+
+    ctypedef  int CFW_ERROR
+
+    ctypedef enum CFW_COM_PORT:
+        CFWPORT_COM1=1, CFWPORT_COM2, CFWPORT_COM3, CFWPORT_COM4
+
+    ctypedef enum CFW_STATUS:
+        CFWS_UNKNOWN, CFWS_IDLE, CFWS_BUSY
+
     cdef cppclass CSBIGCam:
         CSBIGCam(int type)
 
@@ -192,14 +210,14 @@ cdef extern from "../src/csbigcam.h":
         double 			ADToDegreesC(unsigned short ad, MY_LOGICAL ccd)
 
         # CFW Functions
-        #CFW_MODEL_SELECT	GetCFWModel() { return m_eCFWModel; }
-        #PAR_ERROR 			SetCFWModel(CFW_MODEL_SELECT cfwModel, CFW_COM_PORT comPort = CFWPORT_COM1)
-        #PAR_ERROR 			SetCFWPosition(CFW_POSITION position)
-        #PAR_ERROR 			GetCFWPositionAndStatus(CFW_POSITION &position, CFW_STATUS &status)
-        #PAR_ERROR 			GetCFWMaxPosition(CFW_POSITION &position)
-        #CFW_ERROR 			GetCFWError() { return m_eCFWError; }
-        #string 				GetCFWErrorString(CFW_ERROR err)
-        string 				GetCFWErrorString()
+        CFW_MODEL_SELECT	GetCFWModel()
+        PAR_ERROR 			SetCFWModel(CFW_MODEL_SELECT cfwModel, CFW_COM_PORT comPort)
+        PAR_ERROR 			SetCFWPosition(CFW_POSITION position)
+        PAR_ERROR 			GetCFWPositionAndStatus(CFW_POSITION &position, CFW_STATUS &status)
+        PAR_ERROR 			GetCFWMaxPosition(CFW_POSITION &position)
+        CFW_ERROR 			GetCFWError()
+        string 				GetCFWErrorString(CFW_ERROR err)
+        #string 				GetCFWErrorString()
 
         # Allows access directly to driver
         PAR_ERROR SBIGUnivDrvCommand(short command, void *Params, void *Results)

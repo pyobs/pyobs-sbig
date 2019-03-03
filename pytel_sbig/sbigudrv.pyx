@@ -5,7 +5,50 @@ import numpy as np
 cimport numpy as np
 np.import_array()
 
-from .sbigudrv cimport CSBIGCam, CSBIGImg, SBIG_DARK_FRAME
+from .sbigudrv cimport *
+
+
+class FilterWheelModel(Enum):
+    UNKNOWN = CFW_MODEL_SELECT.CFWSEL_UNKNOWN
+    CFW2 = CFW_MODEL_SELECT.CFWSEL_CFW2
+    CFW5 = CFW_MODEL_SELECT.CFWSEL_CFW5
+    CFW8 = CFW_MODEL_SELECT.CFWSEL_CFW8
+    CFWL = CFW_MODEL_SELECT.CFWSEL_CFWL
+    CFW402 = CFW_MODEL_SELECT.CFWSEL_CFW402
+    AUTO = CFW_MODEL_SELECT.CFWSEL_AUTO
+    CFW6A = CFW_MODEL_SELECT.CFWSEL_CFW6A
+    CFW10 = CFW_MODEL_SELECT.CFWSEL_CFW10
+    CFW10_SERIAL = CFW_MODEL_SELECT.CFWSEL_CFW10_SERIAL
+    CFW9 = CFW_MODEL_SELECT.CFWSEL_CFW9
+    CFWL8 = CFW_MODEL_SELECT.CFWSEL_CFWL8
+    CFWL8G = CFW_MODEL_SELECT.CFWSEL_CFWL8G
+    CFW1603 = CFW_MODEL_SELECT.CFWSEL_CFW1603
+    FW5_STX = CFW_MODEL_SELECT.CFWSEL_FW5_STX
+    FW5_8300 = CFW_MODEL_SELECT.CFWSEL_FW5_8300
+    FW8_8300 = CFW_MODEL_SELECT.CFWSEL_FW8_8300
+    FW7_STX = CFW_MODEL_SELECT.CFWSEL_FW7_STX
+    FW8_STT = CFW_MODEL_SELECT.CFWSEL_FW8_STT
+
+
+class FilterWheelComPort(Enum):
+    COM1 = CFW_COM_PORT.CFWPORT_COM1
+    COM2 = CFW_COM_PORT.CFWPORT_COM2
+    COM3 = CFW_COM_PORT.CFWPORT_COM3
+    COM4 = CFW_COM_PORT.CFWPORT_COM4
+
+
+class FilterWheelPosition(Enum):
+    UNKNOW = CFW_POSITION.CFWP_UNKNOWN
+    CFWP_1 = CFW_POSITION.CFWP_1
+    CFWP_2 = CFW_POSITION.CFWP_2
+    CFWP_3 = CFW_POSITION.CFWP_3
+    CFWP_4 = CFW_POSITION.CFWP_4
+    CFWP_5 = CFW_POSITION.CFWP_5
+    CFWP_6 = CFW_POSITION.CFWP_6
+    CFWP_7 = CFW_POSITION.CFWP_7
+    CFWP_8 = CFW_POSITION.CFWP_8
+    CFWP_9 = CFW_POSITION.CFWP_9
+    CFWP_10 = CFW_POSITION.CFWP_10
 
 
 cdef class SBIGImg:
@@ -197,3 +240,26 @@ cdef class SBIGCam:
         res = self.obj.Readout(img.obj, mode)
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
+
+    def set_filter_wheel(self, wheel: FilterWheelModel, com_port: FilterWheelComPort = FilterWheelComPort.COM1):
+        res = self.obj.SetCFWModel(wheel, com_port)
+        if res != 0:
+            raise ValueError(self.obj.GetErrorString(res))
+
+    def set_filter(self, position: FilterWheelPosition):
+        res = self.obj.SetCFWPosition(position)
+        if res != 0:
+            raise ValueError(self.obj.GetErrorString(res))
+
+    def get_filter_position_and_status(self):
+        # define vars
+        cdef CFW_POSITION position = CFW_POSITION.CFWP_UNKNOWN
+        cdef CFW_STATUS status = CFW_STATUS.CFWS_UNKNOWN
+
+        # request from driver
+        res = self.objk.GetCFWPositionAndStatus(position, status)
+        if res != 0:
+            raise ValueError(self.obj.GetErrorString(res))
+
+        # return it
+        return position, status

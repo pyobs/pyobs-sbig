@@ -9,14 +9,15 @@ from astropy.io import fits
 from pytel.interfaces import ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling
 from pytel.modules.camera.basecamera import BaseCamera
 
-from .sbigudrv import SBIGCam, SBIGImg
+from .sbigudrv import *
 
 
 log = logging.getLogger(__name__)
 
 
 class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling):
-    def __init__(self, setpoint: float = -20, *args, **kwargs):
+    def __init__(self, filter_wheel: str = 'UNKNOWN', filter_names: list = None, setpoint: float = -20,
+                 *args, **kwargs):
         BaseCamera.__init__(self, *args, **kwargs)
 
         # create cam
@@ -26,6 +27,16 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # cooling
         self._setpoint = setpoint
 
+        # filter wheel
+        self._filter_wheel = FilterWheelModel[filter_wheel]
+
+        # and filter names
+        if filter_names is None:
+            filter_names = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+        positions = [p for p in FilterWheelPosition]
+        self._filter_names = dict(zip(positions[1:], filter_names))
+        self._filter_names[FilterWheelPosition.UNKNOW] = 'UNKNOWN'
+
         # window and binning
         self._window = None
         self._binning = None
@@ -34,9 +45,22 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         if not BaseCamera.open(self):
             return False
 
+        # set filter wheel model
+        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+            log.info('Initialising filter wheel...')
+            try:
+                self._cam.set_filter_wheel(self._filter_wheel)
+            except ValueError as e:
+                log.error('Could not set filter wheel: %s', e)
+                return False
+
         # open driver
         log.info('Opening SBIG driver...')
-        self._cam.establish_link()
+        try:
+            self._cam.establish_link()
+        except ValueError as e:
+            log.error('Could not establish link: %s', e)
+            return False
 
         # get window and binning from camera
         self._window = self.get_full_frame()
@@ -161,9 +185,53 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # success
         return True
 
+    def set_filter(self, filter_name: str, *args, **kwargs) -> bool:
+        # do we have a filter wheel?
+        if self._filter_wheel == FilterWheelModel.UNKNOWN:
+            raise NotImplementedError
+
+        # reverse dict and search for name
+        filters = {y: x for x, y in self._filter_names.items()}
+        if filter_name not in filters:
+            raise ValueError('Unknown filter: %s', filter_name)
+
+        # set it
+        try:
+            self._cam.set_filter(filters[filter_name])
+            return True
+        except ValueError as e:
+            log.error('Could not set filter: %s', e)
+            return False
+
+    def get_filter(self, *args, **kwargs) -> str:
+        # do we have a filter wheel?
+        if self._filter_wheel == FilterWheelModel.UNKNOWN:
+            raise NotImplementedError
+
+        # get current position and status
+        position, _ = self._cam.GetCFWPositionAndStatus()
+        return self._filter_names[position]
+
+    def list_filters(self, *args, **kwargs) -> list:
+        # do we have a filter wheel?
+        if self._filter_wheel == FilterWheelModel.UNKNOWN:
+            raise NotImplementedError
+
+        return [f for f in self._filter_names.values() if f is not None]
+
     def status(self, *args, **kwargs) -> dict:
         # get status from parent
         s = super().status()
+
+        # do we have a filter wheel?
+        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+            # get filter
+            filter_name = self.get_filter()
+
+            # filter
+            s['IFilter'] = {
+                'Filter': filter_name
+            }
 
         # get cooling
         enabled, temp, setpoint, _ = self._cam.get_cooling()
@@ -179,3 +247,6 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
 
         # finished
         return s
+
+
+__all__ = ['SbigCamera']
