@@ -5,8 +5,8 @@ import threading
 from datetime import datetime
 from astropy.io import fits
 
-from pytel.interfaces import ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling
-from pytel.modules.camera.basecamera import BaseCamera
+from pyobs.interfaces import ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling
+from pyobs.modules.camera.basecamera import BaseCamera
 
 from .sbigudrv import *
 

@@ -10,11 +10,11 @@ the installation instructions in the README.txt.
 *Readout()* method.
 
 
-Install *pytel-sbig*
+Install *pyobs-sbig*
 --------------------
 Clone the repository:
 
-    git clone https://github.com/thusser/pytel-sbig.git
+    git clone https://github.com/pyobs/pyobs-sbig.git
 
 
 Install dependencies:
@@ -29,7 +29,7 @@ And install it:
 
 Configuration
 -------------
-The *SbigCamera* class is derived from *BaseCamera* (see *pytel* documentation) and adds a single new parameter:
+The *SbigCamera* class is derived from *BaseCamera* (see *pyobs* documentation) and adds a single new parameter:
 
     setpoint:
         The initial setpoint in degrees Celsius for the cooling of the camera.
@@ -37,12 +37,12 @@ The *SbigCamera* class is derived from *BaseCamera* (see *pytel* documentation) 
 The class works fine with its default parameters, so a basic module configuration would look like this:
 
     module:
-      class: pytel_sbig.SbigCamera
+      class: pyobs_sbig.SbigCamera
       name: SBIG camera
 
 Dependencies
 ------------
-* **pytel** for the core funcionality. It is not included in the *requirements.txt*, so needs to be installed 
+* **pyobs** for the core funcionality. It is not included in the *requirements.txt*, so needs to be installed 
   separately.
 * [Cython](https://cython.org/) for wrapping the SBIG Universal Driver.
 * [Astropy](http://www.astropy.org/) for FITS file handling.
