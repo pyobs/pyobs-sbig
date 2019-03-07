@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 
 class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling):
-    """A pytel module for SBIG cameras."""
+    """A pyobs module for SBIG cameras."""
 
     def __init__(self, filter_wheel: str = 'UNKNOWN', filter_names: list = None, setpoint: float = -20,
                  *args, **kwargs):
