@@ -154,7 +154,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         self._cam.exposure_time = exposure_time / 1000.
 
         # set exposing
-        self._camera_status = ICamera.CameraStatus.EXPOSING
+        self._camera_status = ICamera.ExposureStatus.EXPOSING
 
         # get date obs
         log.info('Starting exposure with %s shutter for %.2f seconds...',
@@ -169,7 +169,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
 
         # wait for readout
         log.info('Exposure finished, reading out...')
-        self._camera_status = ICamera.CameraStatus.READOUT
+        self._camera_status = ICamera.ExposureStatus.READOUT
 
         # start readout (can raise ValueError)
         self._cam.readout(self._img, open_shutter)
@@ -212,7 +212,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
 
         # return FITS image
         log.info('Readout finished.')
-        self._camera_status = ICamera.CameraStatus.IDLE
+        self._camera_status = ICamera.ExposureStatus.IDLE
         return hdu
 
     def set_cooling(self, enabled: bool, setpoint: float, *args, **kwargs):
