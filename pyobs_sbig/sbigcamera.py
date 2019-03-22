@@ -5,6 +5,7 @@ import threading
 from datetime import datetime
 from astropy.io import fits
 
+from pyobs.events import FilterChangedEvent
 from pyobs.interfaces import ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling
 from pyobs.modules.camera.basecamera import BaseCamera
 
@@ -74,32 +75,33 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
 
         # get window and binning from camera
         self._window = self.get_full_frame()
-        self._binning = {'x': 1, 'y': 1}
+        self._binning = (1, 1)
 
         # cooling
         self.set_cooling(self._setpoint is not None, self._setpoint)
+
+        # subscribe to events
+        if self.comm:
+            self.comm.register_event(FilterChangedEvent)
 
     def close(self):
         """Close module."""
         BaseCamera.close(self)
 
-    def get_full_frame(self, *args, **kwargs) -> dict:
+    def get_full_frame(self, *args, **kwargs) -> (int, int, int, int):
         """Returns full size of CCD.
 
         Returns:
-            Dictionary with left, top, width, and height set.
-
-        Raises:
-            ValueError: If full frame could not be obtained.
+            Tuple with left, top, width, and height set.
         """
         width, height = self._cam.full_frame
-        return {'left': 0, 'top': 0, 'width': width, 'height': height}
+        return 0, 0, width, height
 
-    def get_window(self, *args, **kwargs) -> dict:
+    def get_window(self, *args, **kwargs) -> (int, int, int, int):
         """Returns the camera window.
 
         Returns:
-            Dictionary with left, top, width, and height set.
+            Tuple with left, top, width, and height set.
         """
         return self._window
 
@@ -111,7 +113,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         """
         return self._binning
 
-    def set_window(self, left: float, top: float, width: float, height: float, *args, **kwargs):
+    def set_window(self, left: int, top: int, width: int, height: int, *args, **kwargs):
         """Set the camera window.
 
         Args:
@@ -120,7 +122,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
             width: Width of window.
             height: Height of window.
         """
-        self._window = {'left': int(left), 'top': int(top), 'width': int(width), 'height': int(height)}
+        self._window = (left, top, width, height)
         log.info('Setting window to %dx%d at %d,%d...', width, height, left, top)
 
     def set_binning(self, x: int, y: int, *args, **kwargs):
@@ -130,7 +132,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
             x: X binning.
             y: Y binning.
         """
-        self._binning = {'x': int(x), 'y': int(y)}
+        self._binning = (x, y)
         log.info('Setting binning to %dx%d...', x, y)
 
     def _expose(self, exposure_time: int, open_shutter: bool, abort_event: threading.Event) -> fits.PrimaryHDU:
@@ -154,7 +156,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         self._cam.exposure_time = exposure_time / 1000.
 
         # set exposing
-        self._camera_status = ICamera.ExposureStatus.EXPOSING
+        self._change_exposure_status(ICamera.ExposureStatus.EXPOSING)
 
         # get date obs
         log.info('Starting exposure with %s shutter for %.2f seconds...',
@@ -169,7 +171,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
 
         # wait for readout
         log.info('Exposure finished, reading out...')
-        self._camera_status = ICamera.ExposureStatus.READOUT
+        self._change_exposure_status(ICamera.ExposureStatus.READOUT)
 
         # start readout (can raise ValueError)
         self._cam.readout(self._img, open_shutter)
@@ -207,12 +209,12 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         hdu.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
 
         # biassec/trimsec
-        full = self.get_full_frame()
-        self.set_biassec_trimsec(hdu.header, full['left'], full['top'], full['width'], full['height'])
+        frame = self.get_full_frame()
+        self.set_biassec_trimsec(hdu.header, *frame)
 
         # return FITS image
         log.info('Readout finished.')
-        self._camera_status = ICamera.ExposureStatus.IDLE
+        self._change_exposure_status(ICamera.ExposureStatus.IDLE)
         return hdu
 
     def set_cooling(self, enabled: bool, setpoint: float, *args, **kwargs):
@@ -257,6 +259,9 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
 
         # set it
         self._cam.set_filter(filters[filter_name])
+
+        # send event
+        self.comm.send_event(FilterChangedEvent(filter_name))
 
     def get_filter(self, *args, **kwargs) -> str:
         """Get currently set filter.
