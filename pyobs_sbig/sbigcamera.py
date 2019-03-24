@@ -7,6 +7,7 @@ from astropy.io import fits
 
 from pyobs.events import FilterChangedEvent
 from pyobs.interfaces import ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling
+from pyobs.interfaces.IMotion import Status
 from pyobs.modules.camera.basecamera import BaseCamera
 
 from .sbigudrv import *
@@ -311,41 +312,6 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         """
         enabled, temp, setpoint, _ = self._cam.get_cooling()
         return enabled, temp, 0, {'CCD': temp}
-
-    def status(self, *args, **kwargs) -> dict:
-        """Returns current status of camera.
-
-        Raises:
-            ValueError: If status cannot be obtained.
-        """
-
-        # get status from parent
-        s = super().status()
-
-        # do we have a filter wheel?
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
-            # get filter
-            filter_name = self.get_filter()
-
-            # filter
-            s['IFilter'] = {
-                'Filter': filter_name
-            }
-
-        # get cooling
-        enabled, temp, setpoint, _ = self._cam.get_cooling()
-
-        # add cooling stuff
-        s['ICooling'] = {
-            'Enabled': enabled,
-            'SetPoint': setpoint,
-            'Temperatures': {
-                'CCD': temp
-            }
-        }
-
-        # finished
-        return s
 
 
 __all__ = ['SbigCamera']
