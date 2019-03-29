@@ -125,12 +125,12 @@ cdef class SBIGCam:
 
         # call library
         self.obj.GetSubFrame(left, top, width, height)
-        return {'left': left, 'top': top, 'width': width, 'height': height}
+        return left, top, width, height
 
     @window.setter
-    def window(self, wnd: dict):
+    def window(self, wnd):
         # set window
-        self.obj.SetSubFrame(wnd['left'], wnd['top'], wnd['width'], wnd['height'])
+        self.obj.SetSubFrame(wnd[0], wnd[1], wnd[2], wnd[3])
 
     @property
     def binning(self):
@@ -142,14 +142,14 @@ cdef class SBIGCam:
         # 1 = 2x2 on-chip binning, medium resolution
         # 2 = 3x3 on-chip binning, low resolution (ST-7/8/etc/237 only)
         if mode in [0, 1, 2]:
-            return {'x': mode + 1, 'y': mode + 1}
+            return mode + 1, mode + 1
         else:
             raise ValueError('Unknown readout mode.')
 
     @binning.setter
     def binning(self, binning):
         # check
-        if binning['x'] != binning['y'] or binning['x'] < 0 or binning['x'] > 2:
+        if binning[0] != binning[1 or binning[0] < 0 or binning[0] > 2:
             raise ValueError('Only 1x1, 2x2, and 3x3 binnings supported.')
 
         # set it
