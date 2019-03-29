@@ -7,7 +7,6 @@ from astropy.io import fits
 
 from pyobs.events import FilterChangedEvent
 from pyobs.interfaces import ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling
-from pyobs.interfaces.IMotion import Status
 from pyobs.modules.camera.basecamera import BaseCamera
 
 from .sbigudrv import *
