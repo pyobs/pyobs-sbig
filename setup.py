@@ -3,17 +3,16 @@ from Cython.Build import cythonize
 
 extensions = [
     Extension(
-        'pytel_sbig.sbigudrv',
-        ['pytel_sbig/sbigudrv.pyx', 'src/csbigcam.cpp', 'src/csbigimg.cpp'],
+        'pyobs_sbig.sbigudrv',
+        ['pyobs_sbig/sbigudrv.pyx', 'src/csbigcam.cpp', 'src/csbigimg.cpp'],
         libraries=['sbigudrv', 'cfitsio'],
         extra_compile_args=['-fPIC']
     )
 ]
 
 # setup
-setup(name='pytel_sbig',
+setup(name='pyobs_sbig',
       version='0.1',
-      description='pytel component for SBIG cameras',
-      packages=['pytel_sbig'],
-      ext_modules=cythonize(extensions),
-      requires=['pytel', 'astropy', 'numpy'])
+      description='pyobs module for SBIG cameras',
+      packages=['pyobs_sbig'],
+      ext_modules=cythonize(extensions))
