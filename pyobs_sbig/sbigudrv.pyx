@@ -149,7 +149,7 @@ cdef class SBIGCam:
     @binning.setter
     def binning(self, binning):
         # check
-        if binning[0] != binning[1] or binning[0] < 0 or binning[0] > 2:
+        if binning[0] != binning[1] or binning[0] < 1 or binning[0] > 3:
             raise ValueError('Only 1x1, 2x2, and 3x3 binnings supported.')
 
         # set it
