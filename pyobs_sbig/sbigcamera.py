@@ -196,12 +196,12 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         hdu.header['INSTRUME'] = ('Andor', 'Name of instrument')
 
         # binning
-        hdu.header['XBINNING'] = hdu.header['DET-BIN1'] = (self._binning['x'], 'Binning factor used on X axis')
-        hdu.header['YBINNING'] = hdu.header['DET-BIN2'] = (self._binning['y'], 'Binning factor used on Y axis')
+        hdu.header['XBINNING'] = hdu.header['DET-BIN1'] = (self._binning[0], 'Binning factor used on X axis')
+        hdu.header['YBINNING'] = hdu.header['DET-BIN2'] = (self._binning[1], 'Binning factor used on Y axis')
 
         # window
-        hdu.header['XORGSUBF'] = (self._window['left'], 'Subframe origin on X axis')
-        hdu.header['YORGSUBF'] = (self._window['top'], 'Subframe origin on Y axis')
+        hdu.header['XORGSUBF'] = (self._window[0], 'Subframe origin on X axis')
+        hdu.header['YORGSUBF'] = (self._window[1], 'Subframe origin on Y axis')
 
         # statistics
         hdu.header['DATAMIN'] = (float(np.min(data)), 'Minimum data value')
