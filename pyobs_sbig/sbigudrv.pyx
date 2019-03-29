@@ -1,6 +1,6 @@
 # distutils: language = c++
 import time
-
+from enum import Enum
 import numpy as np
 cimport numpy as np
 np.import_array()
