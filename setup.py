@@ -1,11 +1,14 @@
 from distutils.core import setup, Extension
 from Cython.Build import cythonize
+import numpy
+
 
 extensions = [
     Extension(
         'pyobs_sbig.sbigudrv',
         ['pyobs_sbig/sbigudrv.pyx', 'src/csbigcam.cpp', 'src/csbigimg.cpp'],
         libraries=['sbigudrv', 'cfitsio'],
+        include_dirs=[numpy.get_include(), '/usr/include/cfitsio'],
         extra_compile_args=['-fPIC']
     )
 ]
