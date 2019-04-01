@@ -299,7 +299,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # return names
         return [f for f in self._filter_names.values() if f is not None]
 
-    def get_cooling_status(self, *args, **kwargs) -> (bool,  float, float, dict):
+    def get_cooling_status(self, *args, **kwargs) -> (bool,  float, float):
         """Returns the current status for the cooling.
 
         Returns:
@@ -307,10 +307,20 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
                 Enabled (bool):         Whether the cooling is enabled
                 SetPoint (float):       Setpoint for the cooling in celsius.
                 Power (float):          Current cooling power in percent or None.
-                Temperatures (dict):    Dictionary of sensor name/value pairs with temperatures
         """
         enabled, temp, setpoint, _ = self._cam.get_cooling()
         return enabled, temp, 0, {'CCD': temp}
+
+    def get_temperatures(self, *args, **kwargs) -> dict:
+        """Returns all temperatures measured by this module.
+
+        Returns:
+            Dict containing temperatures.
+        """
+        _, temp, _, _ = self._cam.get_cooling()
+        return {
+            'CCD': temp
+        }
 
 
 __all__ = ['SbigCamera']
