@@ -51,6 +51,12 @@ class FilterWheelPosition(Enum):
     CFWP_10 = CFW_POSITION.CFWP_10
 
 
+class FilterWheelStatus(Enum):
+    UNKNOWN = CFW_STATUS.CFWS_UNKNOWN
+    IDLE = CFW_STATUS.CFWS_IDLE
+    BUSY = CFW_STATUS.CFWS_BUSY
+
+
 cdef class SBIGImg:
     cdef CSBIGImg* obj
 
@@ -262,4 +268,4 @@ cdef class SBIGCam:
             raise ValueError(self.obj.GetErrorString(res))
 
         # return it
-        return position, status
+        return FilterWheelPosition[position], FilterWheelStatus[status]
