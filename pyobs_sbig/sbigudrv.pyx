@@ -38,7 +38,7 @@ class FilterWheelComPort(Enum):
 
 
 class FilterWheelPosition(Enum):
-    UNKNOW = CFW_POSITION.CFWP_UNKNOWN
+    UNKNOWN = CFW_POSITION.CFWP_UNKNOWN
     CFWP_1 = CFW_POSITION.CFWP_1
     CFWP_2 = CFW_POSITION.CFWP_2
     CFWP_3 = CFW_POSITION.CFWP_3
