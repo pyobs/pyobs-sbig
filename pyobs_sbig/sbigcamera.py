@@ -260,6 +260,13 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # set it
         self._cam.set_filter(filters[filter_name])
 
+        # wait for it
+        while True:
+            position, status = self._cam.get_filter_position_and_status()
+            print(position, status)
+            if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
+                break
+
         # send event
         self.comm.send_event(FilterChangedEvent(filter_name))
 
