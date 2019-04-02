@@ -44,6 +44,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
             filter_names = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
         positions = [p for p in FilterWheelPosition]
         self._filter_names = dict(zip(positions[1:], filter_names))
+        self._filter_names[FilterWheelPosition.UNKNOWN] = 'UNKNOWN'
 
         # window and binning
         self._window = None
