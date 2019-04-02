@@ -262,8 +262,8 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
 
         # wait for it
         while True:
+            # break, if wheel is idle and filter is set
             position, status = self._cam.get_filter_position_and_status()
-            print(position, status)
             if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
                 break
 
