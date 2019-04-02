@@ -242,7 +242,7 @@ cdef class SBIGCam:
             raise ValueError(self.obj.GetErrorString(res))
 
     def set_filter_wheel(self, wheel: FilterWheelModel, com_port: FilterWheelComPort = FilterWheelComPort.COM1):
-        res = self.obj.SetCFWModel(wheel, com_port)
+        res = self.obj.SetCFWModel(wheel.value, com_port)
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
 
