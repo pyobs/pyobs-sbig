@@ -155,9 +155,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
             ValueError: If exposure was not successful.
         """
 
-        # set window/binning and exposure time
+        # set binning
         self._cam.binning = self._binning
-        self._cam.window = self._window
+
+        # set window
+        wnd = (self._window[0], self._window[1], self._window[2] / self._binning[0], self._window[3] / self._binning[4])
+        self._cam.window = wnd
+
+        # set exposure time
         self._cam.exposure_time = exposure_time / 1000.
 
         # set exposing
