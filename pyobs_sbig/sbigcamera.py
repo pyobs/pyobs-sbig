@@ -159,7 +159,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         self._cam.binning = self._binning
 
         # set window
-        wnd = (self._window[0], self._window[1], self._window[2] / self._binning[0], self._window[3] / self._binning[4])
+        wnd = (self._window[0], self._window[1], self._window[2] / self._binning[0], self._window[3] / self._binning[1])
         self._cam.window = wnd
 
         # set exposure time
