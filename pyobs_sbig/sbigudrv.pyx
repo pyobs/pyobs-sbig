@@ -257,7 +257,7 @@ cdef class SBIGCam:
         cdef CFW_STATUS status = CFW_STATUS.CFWS_UNKNOWN
 
         # request from driver
-        res = self.objk.GetCFWPositionAndStatus(position, status)
+        res = self.obj.GetCFWPositionAndStatus(position, status)
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
 
