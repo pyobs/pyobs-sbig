@@ -268,4 +268,4 @@ cdef class SBIGCam:
             raise ValueError(self.obj.GetErrorString(res))
 
         # return it
-        return FilterWheelPosition[position], FilterWheelStatus[status]
+        return FilterWheelPosition(position), FilterWheelStatus(status)
