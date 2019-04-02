@@ -267,5 +267,11 @@ cdef class SBIGCam:
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
 
+        # parse it, since for whatever reason, position can be a value not defined in CFW_POSITION...
+        try:
+            pos = FilterWheelPosition(position)
+        except ValueError:
+            pos = FilterWheelPosition.UNKNOWN
+
         # return it
-        return FilterWheelPosition(position), FilterWheelStatus(status)
+        return pos, FilterWheelStatus(status)
