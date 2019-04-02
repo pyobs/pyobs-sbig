@@ -46,6 +46,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         self._filter_names = dict(zip(positions[1:], filter_names))
         self._filter_names[FilterWheelPosition.UNKNOWN] = 'UNKNOWN'
 
+        # allow to abort motion (filter wheel)
+        self._lock_motion = threading.Lock()
+        self._abort_motion = threading.Event()
+
         # window and binning
         self._window = None
         self._binning = None
@@ -257,18 +261,27 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         if filter_name not in filters:
             raise ValueError('Unknown filter: %s', filter_name)
 
-        # set it
-        self._cam.set_filter(filters[filter_name])
+        # acquire lock
+        with LockWithAbort(self._lock_motion, self._abort_motion):
+            # set it
+            log.info('Changing filter to %s...', filter_name)
+            self._cam.set_filter(filters[filter_name])
 
-        # wait for it
-        while True:
-            # break, if wheel is idle and filter is set
-            position, status = self._cam.get_filter_position_and_status()
-            if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
-                break
+            # wait for it
+            while True:
+                # break, if wheel is idle and filter is set
+                position, status = self._cam.get_filter_position_and_status()
+                if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
+                    break
 
-        # send event
-        self.comm.send_event(FilterChangedEvent(filter_name))
+                # abort?
+                if self._abort_motion.is_set():
+                    log.warning('Filter change aborted.')
+                    return
+
+            # send event
+            log.info('Filter changed.')
+            self.comm.send_event(FilterChangedEvent(filter_name))
 
     def get_filter(self, *args, **kwargs) -> str:
         """Get currently set filter.
