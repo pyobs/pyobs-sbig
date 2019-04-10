@@ -52,6 +52,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         self._abort_motion = threading.Event()
 
         # window and binning
+        self._full_frame = None
         self._window = None
         self._binning = None
 
@@ -85,6 +86,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # cooling
         self.set_cooling(self._setpoint is not None, self._setpoint)
 
+        # set binning to 1x1 and get full frame
+        self._cam.binning = self._binning
+        self._full_frame = (0, 0, *self._cam.full_frame)
+
         # subscribe to events
         if self.comm:
             self.comm.register_event(FilterChangedEvent)
@@ -99,8 +104,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         Returns:
             Tuple with left, top, width, and height set.
         """
-        width, height = self._cam.full_frame
-        return 0, 0, width, height
+        return self._full_frame
 
     def get_window(self, *args, **kwargs) -> (int, int, int, int):
         """Returns the camera window.
