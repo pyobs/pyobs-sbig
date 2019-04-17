@@ -222,6 +222,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         hdu.header['DATAMAX'] = (float(np.max(data)), 'Maximum data value')
         hdu.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
 
+        # filter
+        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+            hdu.header['FILTER'] = (self.get_filter(), 'Current filter')
+
         # biassec/trimsec
         frame = self.get_full_frame()
         self.set_biassec_trimsec(hdu.header, *frame)
