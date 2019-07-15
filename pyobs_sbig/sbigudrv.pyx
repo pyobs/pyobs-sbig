@@ -84,8 +84,8 @@ cdef class SBIGImg:
         # new Python object pointing to the existing data
         arr = np.PyArray_SimpleNewFromData(1, shape, np.NPY_USHORT, <void *>self.obj.GetImagePointer())
 
-        # reshape it
-        return arr.reshape((height, width))
+        # reshape and transpose it
+        return arr.reshape((height, width)).T
 
 
 cdef class SBIGCam:
