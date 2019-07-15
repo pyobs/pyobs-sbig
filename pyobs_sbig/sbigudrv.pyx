@@ -88,7 +88,7 @@ cdef class SBIGImg:
         arr = arr.reshape((height, width))
 
         # transpose and return
-        ret = np.empty((width, height))
+        ret = np.empty((width, height), dtype=np.ushort)
         for row in range(height):
             ret[:, row] = arr[row, :]
         return ret
