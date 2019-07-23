@@ -16,7 +16,7 @@ from .sbigudrv import *
 log = logging.getLogger(__name__)
 
 
-class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling):
+class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
     """A pyobs module for SBIG cameras."""
 
     def __init__(self, filter_wheel: str = 'UNKNOWN', filter_names: list = None, setpoint: float = -20,
@@ -46,6 +46,11 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         positions = [p for p in FilterWheelPosition]
         self._filter_names = dict(zip(positions[1:], filter_names))
         self._filter_names[FilterWheelPosition.UNKNOWN] = 'UNKNOWN'
+
+        # if we have a filter wheel, add base class
+        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+            cls = self.__class__
+            self.__class__ = cls.__class__("SbigCamera", tuple([cls] + [IFilters]), {})
 
         # allow to abort motion (filter wheel)
         self._lock_motion = threading.Lock()
