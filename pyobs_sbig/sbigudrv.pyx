@@ -84,8 +84,8 @@ cdef class SBIGImg:
         # new Python object pointing to the existing data
         arr = np.PyArray_SimpleNewFromData(1, shape, np.NPY_USHORT, <void *>self.obj.GetImagePointer())
 
-        # reshape it to 2D
-        return arr.reshape((height, width))
+        # reshape it to 2D and flip
+        return np.flip(arr.reshape((height, width), axis=1)
 
         # transpose and return
         #ret = np.empty((width, height), dtype=np.ushort)
