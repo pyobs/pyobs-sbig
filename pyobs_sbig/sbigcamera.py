@@ -372,6 +372,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
             ValueError: If an error occured.
         """
         self._cam.abort()
+        self._change_exposure_status(ICamera.ExposureStatus.IDLE)
 
 
 __all__ = ['SbigCamera']
