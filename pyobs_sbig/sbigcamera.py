@@ -188,6 +188,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         # start exposure (can raise ValueError)
         self._cam.expose(self._img, open_shutter)
 
+        # was aborted?
+        if self._cam.was_aborted():
+            return None
+
         # wait for readout
         log.info('Exposure finished, reading out...')
         self._change_exposure_status(ICamera.ExposureStatus.READOUT)
@@ -360,6 +364,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         return {
             'CCD': temp
         }
+
+    def _abort_exposure(self):
+        """Abort the running exposure. Should be implemented by derived class.
+
+        Raises:
+            ValueError: If an error occured.
+        """
+        self._cam.abort()
 
 
 __all__ = ['SbigCamera']
