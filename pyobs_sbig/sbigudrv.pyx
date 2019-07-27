@@ -59,7 +59,6 @@ class FilterWheelStatus(Enum):
 
 cdef class SBIGImg:
     cdef CSBIGImg* obj
-    cdef bool aborted
 
     def __cinit__(self):
         self.obj = new CSBIGImg()
