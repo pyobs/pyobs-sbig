@@ -1,7 +1,6 @@
 # distutils: language = c++
 import time
 from enum import Enum
-from libcpp cimport bool
 import numpy as np
 cimport numpy as np
 np.import_array()
@@ -92,11 +91,11 @@ cdef class SBIGImg:
 
 cdef class SBIGCam:
     cdef CSBIGCam* obj
-    cdef bool aborted
+    cdef int aborted
 
     def __cinit__(self):
         self.obj = new CSBIGCam(SBIG_DEVICE_TYPE.DEV_USB)
-        self.aborted = False
+        self.aborted = 0
 
     def establish_link(self):
         res = self.obj.EstablishLink()
@@ -204,14 +203,14 @@ cdef class SBIGCam:
 
     def abort(self):
         # abort exposure
-        self.aborted = True
+        self.aborted = 1
 
     def was_aborted(self):
-        return self.aborted
+        return self.aborted == 1
 
     def expose(self, img: SBIGImg, shutter: bool):
         # not aborted
-        self.aborted = False
+        self.aborted = 0
 
         # define vars
         cdef MY_LOGICAL complete = 0
@@ -241,7 +240,7 @@ cdef class SBIGCam:
             res = self.obj.IsExposureComplete(complete)
 
             # break on error or if complete or aborted
-            if res != 0  or complete or self.aborted:
+            if res != 0  or complete or self.aborted == 1:
                 break
 
             # sleep a little
