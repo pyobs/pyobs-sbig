@@ -92,11 +92,12 @@ cdef class SBIGImg:
 
 cdef class SBIGCam:
     cdef CSBIGCam* obj
-    cdef bool aborted
+
+    def __init__(self):
+        self.aborted = False
 
     def __cinit__(self):
         self.obj = new CSBIGCam(SBIG_DEVICE_TYPE.DEV_USB)
-        self.aborted = False
 
     def establish_link(self):
         res = self.obj.EstablishLink()
