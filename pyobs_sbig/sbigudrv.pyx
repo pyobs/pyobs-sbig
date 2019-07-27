@@ -62,7 +62,6 @@ cdef class SBIGImg:
 
     def __cinit__(self):
         self.obj = new CSBIGImg()
-        self.aborted = False
 
     @property
     def image_can_close(self) -> bool:
