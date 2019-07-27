@@ -59,9 +59,11 @@ class FilterWheelStatus(Enum):
 
 cdef class SBIGImg:
     cdef CSBIGImg* obj
+    cdef bool aborted
 
     def __cinit__(self):
         self.obj = new CSBIGImg()
+        self.aborted = False
 
     @property
     def image_can_close(self) -> bool:
@@ -90,9 +92,11 @@ cdef class SBIGImg:
 
 cdef class SBIGCam:
     cdef CSBIGCam* obj
+    cdef bool aborted
 
     def __cinit__(self):
         self.obj = new CSBIGCam(SBIG_DEVICE_TYPE.DEV_USB)
+        self.aborted = False
 
     def establish_link(self):
         res = self.obj.EstablishLink()
@@ -198,7 +202,17 @@ cdef class SBIGCam:
         # return it
         return enabled == 1, temp, setpoint, power
 
+    def abort(self):
+        # abort exposure
+        self.aborted = True
+
+    def was_aborted(self):
+        return self.aborted
+
     def expose(self, img: SBIGImg, shutter: bool):
+        # not aborted
+        self.aborted = False
+
         # define vars
         cdef MY_LOGICAL complete = 0
 
@@ -226,8 +240,8 @@ cdef class SBIGCam:
             # is complete?
             res = self.obj.IsExposureComplete(complete)
 
-            # break on error or if complete
-            if res != 0  or complete:
+            # break on error or if complete or aborted
+            if res != 0  or complete or self.aborted:
                 break
 
             # sleep a little
