@@ -85,14 +85,7 @@ cdef class SBIGImg:
         arr = np.PyArray_SimpleNewFromData(1, shape, np.NPY_USHORT, <void *>self.obj.GetImagePointer())
 
         # reshape it to 2D
-        arr = arr.reshape(height, width)
-        #return np.flip(arr.reshape(height, width), axis=1)
-
-        # transpose and return
-        ret = np.empty((width, height), dtype=np.ushort)
-        for row in range(height):
-            ret[:, row] = arr[row, :]
-        return ret
+        return arr.reshape(height, width)
 
 
 cdef class SBIGCam:
