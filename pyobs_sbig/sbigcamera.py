@@ -51,6 +51,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         if self._filter_wheel != FilterWheelModel.UNKNOWN:
             cls = self.__class__
             self.__class__ = cls.__class__("SbigCamera", tuple([cls] + [IFilters]), {})
+            self._get_interfaces_and_methods()
 
         # allow to abort motion (filter wheel)
         self._lock_motion = threading.Lock()
