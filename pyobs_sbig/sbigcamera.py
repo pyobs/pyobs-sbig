@@ -16,7 +16,7 @@ from .sbigudrv import *
 log = logging.getLogger(__name__)
 
 
-class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling):
+class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
     """A pyobs module for SBIG cameras."""
 
     def __init__(self, filter_wheel: str = 'UNKNOWN', filter_names: list = None, setpoint: float = -20,
@@ -47,11 +47,21 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         self._filter_names = dict(zip(positions[1:], filter_names))
         self._filter_names[FilterWheelPosition.UNKNOWN] = 'UNKNOWN'
 
+        # if we have a filter wheel, add base class
+        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+            cls = self.__class__
+            self.__class__ = cls.__class__("SbigCamera", tuple([cls] + [IFilters]), {})
+
+            # update interfaces description
+            self._get_interfaces_and_methods()
+            self.comm.module = self
+
         # allow to abort motion (filter wheel)
         self._lock_motion = threading.Lock()
         self._abort_motion = threading.Event()
 
         # window and binning
+        self._full_frame = None
         self._window = None
         self._binning = None
 
@@ -85,6 +95,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # cooling
         self.set_cooling(self._setpoint is not None, self._setpoint)
 
+        # set binning to 1x1 and get full frame
+        self._cam.binning = self._binning
+        self._full_frame = (0, 0, *self._cam.full_frame)
+
         # subscribe to events
         if self.comm:
             self.comm.register_event(FilterChangedEvent)
@@ -99,8 +113,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         Returns:
             Tuple with left, top, width, and height set.
         """
-        width, height = self._cam.full_frame
-        return 0, 0, width, height
+        return self._full_frame
 
     def get_window(self, *args, **kwargs) -> (int, int, int, int):
         """Returns the camera window.
@@ -179,6 +192,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         # start exposure (can raise ValueError)
         self._cam.expose(self._img, open_shutter)
 
+        # was aborted?
+        if self._cam.was_aborted():
+            return None
+
         # wait for readout
         log.info('Exposure finished, reading out...')
         self._change_exposure_status(ICamera.ExposureStatus.READOUT)
@@ -217,6 +234,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         hdu.header['DATAMIN'] = (float(np.min(data)), 'Minimum data value')
         hdu.header['DATAMAX'] = (float(np.max(data)), 'Maximum data value')
         hdu.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
+
+        # filter
+        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+            hdu.header['FILTER'] = (self.get_filter(), 'Current filter')
 
         # biassec/trimsec
         frame = self.get_full_frame()
@@ -347,6 +368,15 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, IFilters, I
         return {
             'CCD': temp
         }
+
+    def _abort_exposure(self):
+        """Abort the running exposure. Should be implemented by derived class.
+
+        Raises:
+            ValueError: If an error occured.
+        """
+        self._cam.abort()
+        self._change_exposure_status(ICamera.ExposureStatus.IDLE)
 
 
 __all__ = ['SbigCamera']

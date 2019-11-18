@@ -84,15 +84,17 @@ cdef class SBIGImg:
         # new Python object pointing to the existing data
         arr = np.PyArray_SimpleNewFromData(1, shape, np.NPY_USHORT, <void *>self.obj.GetImagePointer())
 
-        # reshape it
-        return arr.reshape((height, width))
+        # reshape it to 2D
+        return arr.reshape(height, width)
 
 
 cdef class SBIGCam:
     cdef CSBIGCam* obj
+    cdef int aborted
 
     def __cinit__(self):
         self.obj = new CSBIGCam(SBIG_DEVICE_TYPE.DEV_USB)
+        self.aborted = 0
 
     def establish_link(self):
         res = self.obj.EstablishLink()
@@ -198,7 +200,17 @@ cdef class SBIGCam:
         # return it
         return enabled == 1, temp, setpoint, power
 
+    def abort(self):
+        # abort exposure
+        self.aborted = 1
+
+    def was_aborted(self):
+        return self.aborted == 1
+
     def expose(self, img: SBIGImg, shutter: bool):
+        # not aborted
+        self.aborted = 0
+
         # define vars
         cdef MY_LOGICAL complete = 0
 
@@ -226,8 +238,8 @@ cdef class SBIGCam:
             # is complete?
             res = self.obj.IsExposureComplete(complete)
 
-            # break on error or if complete
-            if res != 0  or complete:
+            # break on error or if complete or aborted
+            if res != 0  or complete or self.aborted == 1:
                 break
 
             # sleep a little
