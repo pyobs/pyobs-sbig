@@ -1,7 +1,6 @@
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 from Cython.Build import cythonize
 import numpy
-
 
 extensions = [
     Extension(
@@ -14,8 +13,15 @@ extensions = [
 ]
 
 # setup
-setup(name='pyobs_sbig',
-      version='0.2',
-      description='pyobs module for SBIG cameras',
-      packages=['pyobs_sbig'],
-      ext_modules=cythonize(extensions))
+setup(
+    name='pyobs-sbig',
+    version='0.8',
+    description='pyobs module for SBIG cameras',
+    packages=['pyobs_sbig'],
+    ext_modules=cythonize(extensions),
+    install_requires=[
+        'cython',
+        'numpy',
+        'astropy'
+    ]
+)
