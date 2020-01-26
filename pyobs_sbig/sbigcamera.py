@@ -5,10 +5,8 @@ import threading
 from datetime import datetime
 from astropy.io import fits
 
-from pyobs.events import FilterChangedEvent
-from pyobs.interfaces import ICamera, ICameraWindow, ICameraBinning, IFilters, ICooling
+from pyobs.interfaces import ICamera, ICameraWindow, ICameraBinning, ICooling
 from pyobs.modules.camera.basecamera import BaseCamera
-from pyobs.utils.threads import LockWithAbort
 
 from .sbigudrv import *
 
@@ -19,13 +17,10 @@ log = logging.getLogger(__name__)
 class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
     """A pyobs module for SBIG cameras."""
 
-    def __init__(self, filter_wheel: str = 'UNKNOWN', filter_names: list = None, setpoint: float = -20,
-                 *args, **kwargs):
+    def __init__(self, setpoint: float = -20, *args, **kwargs):
         """Initializes a new SbigCamera.
 
         Args:
-            filter_wheel: Name of filter wheel used by the camera.
-            filter_names: List of filter names.
             setpoint: Cooling temperature setpoint.
         """
         BaseCamera.__init__(self, *args, **kwargs)
@@ -36,29 +31,6 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
 
         # cooling
         self._setpoint = setpoint
-
-        # filter wheel
-        self._filter_wheel = FilterWheelModel[filter_wheel]
-
-        # and filter names
-        if filter_names is None:
-            filter_names = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
-        positions = [p for p in FilterWheelPosition]
-        self._filter_names = dict(zip(positions[1:], filter_names))
-        self._filter_names[FilterWheelPosition.UNKNOWN] = 'UNKNOWN'
-
-        # if we have a filter wheel, add base class
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
-            cls = self.__class__
-            self.__class__ = cls.__class__("SbigCamera", tuple([cls] + [IFilters]), {})
-
-            # update interfaces description
-            self._get_interfaces_and_methods()
-            self.comm.module = self
-
-        # allow to abort motion (filter wheel)
-        self._lock_motion = threading.Lock()
-        self._abort_motion = threading.Event()
 
         # window and binning
         self._full_frame = None
@@ -72,14 +44,6 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
             ValueError: If cannot connect to camera or set filter wheel.
         """
         BaseCamera.open(self)
-
-        # set filter wheel model
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
-            log.info('Initialising filter wheel...')
-            try:
-                self._cam.set_filter_wheel(self._filter_wheel)
-            except ValueError as e:
-                raise ValueError('Could not set filter wheel: %s' % str(e))
 
         # open driver
         log.info('Opening SBIG driver...')
@@ -98,14 +62,6 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         # set binning to 1x1 and get full frame
         self._cam.binning = self._binning
         self._full_frame = (0, 0, *self._cam.full_frame)
-
-        # subscribe to events
-        if self.comm:
-            self.comm.register_event(FilterChangedEvent)
-
-    def close(self):
-        """Close module."""
-        BaseCamera.close(self)
 
     def get_full_frame(self, *args, **kwargs) -> (int, int, int, int):
         """Returns full size of CCD.
@@ -235,10 +191,6 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         hdu.header['DATAMAX'] = (float(np.max(data)), 'Maximum data value')
         hdu.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
 
-        # filter
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
-            hdu.header['FILTER'] = (self.get_filter(), 'Current filter')
-
         # biassec/trimsec
         frame = self.get_full_frame()
         self.set_biassec_trimsec(hdu.header, *frame)
@@ -267,84 +219,6 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
 
         # do it
         self._cam.set_cooling(enabled, setpoint)
-
-    def set_filter(self, filter_name: str, *args, **kwargs):
-        """Set the current filter.
-
-        Args:
-            filter_name: Name of filter to set.
-
-        Raises:
-            ValueError: If binning could not be set.
-            NotImplementedError: If camera doesn't have a filter wheel.
-        """
-
-        # do we have a filter wheel?
-        if self._filter_wheel == FilterWheelModel.UNKNOWN:
-            raise NotImplementedError
-
-        # reverse dict and search for name
-        filters = {y: x for x, y in self._filter_names.items()}
-        if filter_name not in filters:
-            raise ValueError('Unknown filter: %s', filter_name)
-
-        # acquire lock
-        with LockWithAbort(self._lock_motion, self._abort_motion):
-            # set it
-            log.info('Changing filter to %s...', filter_name)
-            self._cam.set_filter(filters[filter_name])
-
-            # wait for it
-            while True:
-                # break, if wheel is idle and filter is set
-                position, status = self._cam.get_filter_position_and_status()
-                if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
-                    break
-
-                # abort?
-                if self._abort_motion.is_set():
-                    log.warning('Filter change aborted.')
-                    return
-
-            # send event
-            log.info('Filter changed.')
-            self.comm.send_event(FilterChangedEvent(filter_name))
-
-    def get_filter(self, *args, **kwargs) -> str:
-        """Get currently set filter.
-
-        Returns:
-            Name of currently set filter.
-
-        Raises:
-            ValueError: If filter could not be fetched.
-            NotImplementedError: If camera doesn't have a filter wheel.
-        """
-
-        # do we have a filter wheel?
-        if self._filter_wheel == FilterWheelModel.UNKNOWN:
-            raise NotImplementedError
-
-        # get current position and status
-        position, _ = self._cam.get_filter_position_and_status()
-        return self._filter_names[position]
-
-    def list_filters(self, *args, **kwargs) -> list:
-        """List available filters.
-
-        Returns:
-            List of available filters.
-
-        Raises:
-            NotImplementedError: If camera doesn't have a filter wheel.
-        """
-
-        # do we have a filter wheel?
-        if self._filter_wheel == FilterWheelModel.UNKNOWN:
-            raise NotImplementedError
-
-        # return names
-        return [f for f in self._filter_names.values() if f is not None]
 
     def get_cooling_status(self, *args, **kwargs) -> (bool,  float, float):
         """Returns the current status for the cooling.
