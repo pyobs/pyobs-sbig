@@ -42,6 +42,9 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         self._lock_motion = threading.Lock()
         self._abort_motion = threading.Event()
 
+        # init mixins
+        MotionStatusMixin.__init__(self, *args, **kwargs)
+
     def open(self):
         """Open module.
 
