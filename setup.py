@@ -15,7 +15,7 @@ extensions = [
 # setup
 setup(
     name='pyobs-sbig',
-    version='0.8.1',
+    version='0.9',
     description='pyobs module for SBIG cameras',
     packages=['pyobs_sbig'],
     ext_modules=cythonize(extensions),
