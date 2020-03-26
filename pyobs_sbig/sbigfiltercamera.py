@@ -59,6 +59,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
                 self._cam.set_filter_wheel(self._filter_wheel)
             except ValueError as e:
                 raise ValueError('Could not set filter wheel: %s' % str(e))
+            self._change_motion_status(IMotion.Status.POSITIONED, interface='IFilters')
 
         # open camera
         SbigCamera.open(self)
