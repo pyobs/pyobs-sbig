@@ -108,13 +108,19 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         if self._filter_wheel == FilterWheelModel.UNKNOWN:
             raise NotImplementedError
 
-        # set status
-        self._change_motion_status(IMotion.Status.SLEWING, interface='IFilters')
-
         # reverse dict and search for name
         filters = {y: x for x, y in self._filter_names.items()}
         if filter_name not in filters:
             raise ValueError('Unknown filter: %s', filter_name)
+
+        # there already?
+        position, status = self._cam.get_filter_position_and_status()
+        if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
+            log.info('Filter changed.')
+            return
+
+        # set status
+        self._change_motion_status(IMotion.Status.SLEWING, interface='IFilters')
 
         # acquire lock
         with LockWithAbort(self._lock_motion, self._abort_motion):
