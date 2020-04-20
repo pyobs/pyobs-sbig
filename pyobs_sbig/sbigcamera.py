@@ -131,10 +131,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         # set window, CSBIGCam expects left/top also in binned coordinates, so divide by binning
         left = int(math.floor(self._window[0]) / self._binning[0])
         top = int(math.floor(self._window[1]) / self._binning[1])
-        width = self._window[2]
-        height = self._window[3]
+        width = int(math.floor(self._window[2]) / self._binning[0])
+        height = int(math.floor(self._window[3]) / self._binning[1])
         log.info("Set window to %dx%d (binned %dx%d) at %d,%d.",
-                 self._window[2] * self._binning[0], self._window[3] * self._binning[1], width, height, left, top)
+                 self._window[2], self._window[3], width, height, left, top)
         self._cam.window = (left, top, width, height)
 
         # set exposure time
