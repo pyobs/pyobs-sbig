@@ -128,17 +128,13 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         # set binning
         self._cam.binning = self._binning
 
-        # set window, divide width/height by binning, from SBIGUDRV.DOC:
-        # ushort top – top most row to readout (0 based)
-        # ushort left – left most pixel to readout (0 based)
-        # ushort height – image height in binned pixels
-        # ushort width – image width in binned pixels
+        # set window, divide all by binning
+        left = int(math.floor(self._window[0]) / self._binning[0])
+        top = int(math.floor(self._window[1]) / self._binning[1])
         width = int(math.floor(self._window[2]) / self._binning[0])
         height = int(math.floor(self._window[3]) / self._binning[1])
-        log.info("Set window to %dx%d (binned %dx%d) at %d,%d.",
-                 self._window[2], self._window[3], width, height,
-                 self._window[0], self._window[1])
-        self._cam.window = (self._window[0], self._window[1], width, height)
+        log.info("Set window to %dx%d (binned %dx%d) at %d,%d.", self._window[2], self._window[3], width, height, left, top)
+        self._cam.window = (left, top, width, height)
 
         # set exposure time
         self._cam.exposure_time = exposure_time / 1000.
