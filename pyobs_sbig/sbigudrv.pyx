@@ -2,11 +2,20 @@
 import threading
 import time
 from enum import Enum
+from contextlib import contextmanager
 import numpy as np
 cimport numpy as np
 np.import_array()
 
 from .sbigudrv cimport *
+
+
+@contextmanager
+def acquire_lock(lock):
+    if not lock.acquire(timeout=1):
+        raise ValueError('Could not acquire exclusive lock on camera.')
+    yield
+    lock.release()
 
 
 class FilterWheelModel(Enum):
@@ -108,12 +117,12 @@ cdef class SBIGCam:
 
     @property
     def readout_mode(self):
-        with self.lock:
+        with acquire_lock(self.lock):
             return self.obj.GetReadoutMode()
 
     @readout_mode.setter
     def readout_mode(self, rm):
-        with self.lock:
+        with acquire_lock(self.lock):
             self.obj.SetReadoutMode(rm)
 
     @property
@@ -122,13 +131,12 @@ cdef class SBIGCam:
         cdef int width = 0
         cdef int height = 0
 
-        # call library
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
+            # call library
             res = self.obj.GetFullFrame(width, height)
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(res))
-
-            # finished
             return width, height
 
     @property
@@ -139,21 +147,23 @@ cdef class SBIGCam:
         cdef int width = 0
         cdef int height = 0
 
-        # call library
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
+            # call library
             self.obj.GetSubFrame(left, top, width, height)
             return left, top, width, height
 
     @window.setter
     def window(self, wnd):
         # set window
-        with self.lock:
+        with acquire_lock(self.lock):
             self.obj.SetSubFrame(wnd[0], wnd[1], wnd[2], wnd[3])
 
     @property
     def binning(self):
-        # get readout mode
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
+            # get readout mode
             mode = self.obj.GetReadoutMode()
 
             # return it
@@ -172,60 +182,52 @@ cdef class SBIGCam:
             raise ValueError('Only 1x1, 2x2, and 3x3 binnings supported.')
 
         # set it
-        with self.lock:
+        with acquire_lock(self.lock):
             self.obj.SetReadoutMode(binning[0] - 1)
 
     @property
     def exposure_time(self):
-        with self.lock:
+        with acquire_lock(self.lock):
             return self.obj.GetExposureTime()
 
     @exposure_time.setter
     def exposure_time(self, exp):
-        with self.lock:
+        with acquire_lock(self.lock):
             self.obj.SetExposureTime(exp)
 
     @property
     def temperature(self):
-        # lock with timeout, since this might be called during exposure/readout
-        if not self.lock.acquire(timeout=1):
-            return None
-
-        # get temp
         cdef double temp = 0
-        res = self.obj.GetCCDTemperature(temp)
 
-        # release lock and return
-        self.lock.release()
-        if res != 0:
-            raise ValueError(self.obj.GetErrorString(res))
-        return temp
+        # acquire lock
+        with acquire_lock(self.lock):
+            # get temp
+            res = self.obj.GetCCDTemperature(temp)
+            if res != 0:
+                raise ValueError(self.obj.GetErrorString(res))
+            return temp
 
     def set_cooling(self, enable: bool, setpoint: float):
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
             res = self.obj.SetTemperatureRegulation(enable, setpoint)
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(res))
 
     def get_cooling(self):
-        # lock with timeout, since this might be called during exposure/readout
-        if not self.lock.acquire(timeout=1):
-            return None, None, None, None
-
         # define vars
         cdef MY_LOGICAL enabled = 0
         cdef double temp = 0.
         cdef double setpoint = 0.
         cdef double power = 0.
 
-        # get it
-        res = self.obj.QueryTemperatureStatus(enabled, temp, setpoint, power)
-
-        # release lock and return
-        self.lock.release()
-        if res != 0:
-            raise ValueError(self.obj.GetErrorString(res))
-        return enabled == 1, temp, setpoint, power
+        # acquire lock
+        with acquire_lock(self.lock):
+            # get it
+            res = self.obj.QueryTemperatureStatus(enabled, temp, setpoint, power)
+            if res != 0:
+                raise ValueError(self.obj.GetErrorString(res))
+            return enabled == 1, temp, setpoint, power
 
     def abort(self):
         # abort exposure
@@ -235,16 +237,17 @@ cdef class SBIGCam:
         return self.aborted
 
     def expose(self, img: SBIGImg, shutter: bool):
-        # not aborted
-        self.aborted = False
-
-        # define vars
+         # define vars
         cdef MY_LOGICAL complete = 0
 
-        # get mode
-        mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
+        # acquire lock
+        with acquire_lock(self.lock):
+            # not aborted
+            self.aborted = False
 
-        with self.lock:
+            # get mode
+            mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
+
             # do setup
             res = self.obj.GrabSetup(img.obj, mode)
             if res != 0:
@@ -288,21 +291,24 @@ cdef class SBIGCam:
         cdef SBIG_DARK_FRAME mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
         cdef int res = 0
 
-        # do readout
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
+            # do readout
             with nogil:
                 res = int(SBIGCam._readout(self.obj, img.obj, mode))
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(int(res)))
 
     def set_filter_wheel(self, wheel: FilterWheelModel, com_port: FilterWheelComPort = FilterWheelComPort.COM1):
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
             res = self.obj.SetCFWModel(wheel.value, com_port.value)
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(res))
 
     def set_filter(self, position: FilterWheelPosition):
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
             res = self.obj.SetCFWPosition(position.value)
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(res))
@@ -312,8 +318,9 @@ cdef class SBIGCam:
         cdef CFW_POSITION position = CFW_POSITION.CFWP_UNKNOWN
         cdef CFW_STATUS status = CFW_STATUS.CFWS_UNKNOWN
 
-        # request from driver
-        with self.lock:
+        # acquire lock
+        with acquire_lock(self.lock):
+            # request from driver
             res = self.obj.GetCFWPositionAndStatus(position, status)
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(res))

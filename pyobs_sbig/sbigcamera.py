@@ -39,7 +39,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         self._binning = None
 
         # cooling and temps to return in case of blocked device
-        self._cooling = None
+        self._cooling = None, None, None
         self._temps = None
 
     def open(self):
@@ -239,14 +239,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
                 SetPoint (float):       Setpoint for the cooling in celsius.
                 Power (float):          Current cooling power in percent or None.
         """
-        enabled, temp, setpoint, _ = self._cam.get_cooling()
 
-        # Nones?
-        if enabled is None and self._cooling is not None:
-            return self._cooling
-        else:
-            self._cooling = enabled, temp, 0, {'CCD': temp}
-            return self._cooling
+        try:
+            enabled, temp, setpoint, _ = self._cam.get_cooling()
+            self._cooling = enabled, temp, setpoint
+        except ValueError:
+            # use existing cooling
+            pass
+        return self._cooling
 
     def get_temperatures(self, *args, **kwargs) -> dict:
         """Returns all temperatures measured by this module.
@@ -254,14 +254,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         Returns:
             Dict containing temperatures.
         """
-        _, temp, _, _ = self._cam.get_cooling()
 
-        # Nones?
-        if temp is None and self._temps is not None:
-            return self._temps
-        else:
+        try:
+            _, temp, _, _ = self._cam.get_cooling()
             self._temps = {'CCD': temp}
-            return self._temps
+        except ValueError:
+            # use existing temps
+            pass
+        return self._temps
 
     def _abort_exposure(self):
         """Abort the running exposure. Should be implemented by derived class.
