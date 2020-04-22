@@ -91,8 +91,8 @@ cdef class SBIGImg:
 
 cdef class SBIGCam:
     cdef CSBIGCam* obj
-    aborted = None
-    lock = None
+    cdef object aborted
+    cdef object lock
 
     def __cinit__(self):
         self.obj = new CSBIGCam(SBIG_DEVICE_TYPE.DEV_USB)
