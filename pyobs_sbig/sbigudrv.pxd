@@ -175,7 +175,7 @@ cdef extern from "../src/csbigcam.h":
         PAR_ERROR GrabMain (CSBIGImg *pImg, SBIG_DARK_FRAME dark)
         PAR_ERROR GrabImage(CSBIGImg *pImg, SBIG_DARK_FRAME dark)
         #void 	  GetGrabState(GRAB_STATE &grabState, double &percentComplete)
-        PAR_ERROR Readout  (CSBIGImg *pImg, SBIG_DARK_FRAME dark)
+        PAR_ERROR Readout  (CSBIGImg *pImg, SBIG_DARK_FRAME dark) nogil
 
         # Low-Level Exposure Related Commands
         PAR_ERROR StartExposure(SHUTTER_COMMAND shutterState)

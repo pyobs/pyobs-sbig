@@ -250,12 +250,17 @@ cdef class SBIGCam:
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
 
+    @staticmethod
+    cdef int _readout(CSBIGCam *cam, CSBIGImg *img, SBIG_DARK_FRAME mode) nogil:
+        cdef int res = cam.Readout(img, mode)
+        return res
+
     def readout(self, img: SBIGImg, shutter: bool):
         # get mode
-        mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
+        cdef SBIG_DARK_FRAME mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
 
         # do readout
-        res = self.obj.Readout(img.obj, mode)
+        res = int(SBIGCam._readout(self.obj, img.obj, mode))
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
 
