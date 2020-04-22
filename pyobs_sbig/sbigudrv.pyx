@@ -91,11 +91,12 @@ cdef class SBIGImg:
 
 cdef class SBIGCam:
     cdef CSBIGCam* obj
-    cdef int aborted
 
     def __cinit__(self):
         self.obj = new CSBIGCam(SBIG_DEVICE_TYPE.DEV_USB)
-        self.aborted = 0
+
+    def __init__(self):
+        self.aborted = False
         self.lock = threading.Lock()
 
     def establish_link(self):
@@ -185,7 +186,8 @@ cdef class SBIGCam:
     @property
     def temperature(self):
         # lock with timeout, since this might be called during exposure/readout
-        res = self.lock.acquire(timeout=1)
+        if not self.lock.acquire(timeout=1):
+            return None
 
         # get temp
         cdef double temp = 0
@@ -205,7 +207,8 @@ cdef class SBIGCam:
 
     def get_cooling(self):
         # lock with timeout, since this might be called during exposure/readout
-        res = self.lock.acquire(timeout=1)
+        if not self.lock.acquire(timeout=1):
+            return None, None, None, None
 
         # define vars
         cdef MY_LOGICAL enabled = 0
@@ -224,14 +227,14 @@ cdef class SBIGCam:
 
     def abort(self):
         # abort exposure
-        self.aborted = 1
+        self.aborted = True
 
     def was_aborted(self):
-        return self.aborted == 1
+        return self.aborted
 
     def expose(self, img: SBIGImg, shutter: bool):
         # not aborted
-        self.aborted = 0
+        self.aborted = False
 
         # define vars
         cdef MY_LOGICAL complete = 0
@@ -262,7 +265,7 @@ cdef class SBIGCam:
                 res = self.obj.IsExposureComplete(complete)
 
                 # break on error or if complete or aborted
-                if res != 0  or complete or self.aborted == 1:
+                if res != 0  or complete or self.aborted:
                     break
 
                 # sleep a little
