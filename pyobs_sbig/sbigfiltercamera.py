@@ -42,6 +42,9 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         self._lock_motion = threading.Lock()
         self._abort_motion = threading.Event()
 
+        # current position
+        self._position = FilterWheelPosition.UNKNOWN
+
         # init mixins
         MotionStatusMixin.__init__(self, *args, **kwargs, motion_status_interfaces=['IFilters'])
 
@@ -162,9 +165,12 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         if self._filter_wheel == FilterWheelModel.UNKNOWN:
             raise NotImplementedError
 
-        # get current position and status
-        position, _ = self._cam.get_filter_position_and_status()
-        return self._filter_names[position]
+        try:
+            self._position, _ = self._cam.get_filter_position_and_status()
+        except ValueError:
+            # use existing position
+            pass
+        return self._filter_names[self._position]
 
     def list_filters(self, *args, **kwargs) -> list:
         """List available filters.
