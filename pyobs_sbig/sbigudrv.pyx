@@ -258,11 +258,13 @@ cdef class SBIGCam:
     def readout(self, img: SBIGImg, shutter: bool):
         # get mode
         cdef SBIG_DARK_FRAME mode = SBIG_DARK_FRAME.SBDF_LIGHT_ONLY if shutter else SBIG_DARK_FRAME.SBDF_DARK_ONLY
+        cdef int res = 0
 
         # do readout
-        res = int(SBIGCam._readout(self.obj, img.obj, mode))
+        with nogil:
+            res = int(SBIGCam._readout(self.obj, img.obj, mode))
         if res != 0:
-            raise ValueError(self.obj.GetErrorString(res))
+            raise ValueError(self.obj.GetErrorString(int(res)))
 
     def set_filter_wheel(self, wheel: FilterWheelModel, com_port: FilterWheelComPort = FilterWheelComPort.COM1):
         res = self.obj.SetCFWModel(wheel.value, com_port.value)
