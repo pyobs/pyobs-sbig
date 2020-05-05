@@ -1,6 +1,7 @@
 # distutils: language = c++
 
 import logging
+import math
 import threading
 from datetime import datetime
 from astropy.io import fits
@@ -36,6 +37,10 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         self._full_frame = None
         self._window = None
         self._binning = None
+
+        # cooling and temps to return in case of blocked device
+        self._cooling = None, None, None
+        self._temps = None
 
     def open(self):
         """Open module.
@@ -127,9 +132,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         # set binning
         self._cam.binning = self._binning
 
-        # set window
-        wnd = (self._window[0], self._window[1], self._window[2] / self._binning[0], self._window[3] / self._binning[1])
-        self._cam.window = wnd
+        # set window, CSBIGCam expects left/top also in binned coordinates, so divide by binning
+        left = int(math.floor(self._window[0]) / self._binning[0])
+        top = int(math.floor(self._window[1]) / self._binning[1])
+        width = int(math.floor(self._window[2]) / self._binning[0])
+        height = int(math.floor(self._window[3]) / self._binning[1])
+        log.info("Set window to %dx%d (binned %dx%d) at %d,%d.",
+                 self._window[2], self._window[3], width, height, left, top)
+        self._cam.window = (left, top, width, height)
 
         # set exposure time
         self._cam.exposure_time = exposure_time / 1000.
@@ -229,8 +239,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
                 SetPoint (float):       Setpoint for the cooling in celsius.
                 Power (float):          Current cooling power in percent or None.
         """
-        enabled, temp, setpoint, _ = self._cam.get_cooling()
-        return enabled, temp, 0, {'CCD': temp}
+
+        try:
+            enabled, temp, setpoint, _ = self._cam.get_cooling()
+            self._cooling = enabled, temp, setpoint
+        except ValueError:
+            # use existing cooling
+            pass
+        return self._cooling
 
     def get_temperatures(self, *args, **kwargs) -> dict:
         """Returns all temperatures measured by this module.
@@ -238,10 +254,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         Returns:
             Dict containing temperatures.
         """
-        _, temp, _, _ = self._cam.get_cooling()
-        return {
-            'CCD': temp
-        }
+
+        try:
+            _, temp, _, _ = self._cam.get_cooling()
+            self._temps = {'CCD': temp}
+        except ValueError:
+            # use existing temps
+            pass
+        return self._temps
 
     def _abort_exposure(self):
         """Abort the running exposure. Should be implemented by derived class.

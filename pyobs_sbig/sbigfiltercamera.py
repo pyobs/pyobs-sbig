@@ -42,8 +42,11 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         self._lock_motion = threading.Lock()
         self._abort_motion = threading.Event()
 
+        # current position
+        self._position = FilterWheelPosition.UNKNOWN
+
         # init mixins
-        MotionStatusMixin.__init__(self, *args, **kwargs)
+        MotionStatusMixin.__init__(self, *args, **kwargs, motion_status_interfaces=['IFilters'])
 
     def open(self):
         """Open module.
@@ -59,6 +62,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
                 self._cam.set_filter_wheel(self._filter_wheel)
             except ValueError as e:
                 raise ValueError('Could not set filter wheel: %s' % str(e))
+            self._change_motion_status(IMotion.Status.POSITIONED, interface='IFilters')
 
         # open camera
         SbigCamera.open(self)
@@ -107,13 +111,19 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         if self._filter_wheel == FilterWheelModel.UNKNOWN:
             raise NotImplementedError
 
-        # set status
-        self._change_motion_status(IMotion.Status.SLEWING, interface='IFilters')
-
         # reverse dict and search for name
         filters = {y: x for x, y in self._filter_names.items()}
         if filter_name not in filters:
             raise ValueError('Unknown filter: %s', filter_name)
+
+        # there already?
+        position, status = self._cam.get_filter_position_and_status()
+        if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
+            log.info('Filter changed.')
+            return
+
+        # set status
+        self._change_motion_status(IMotion.Status.SLEWING, interface='IFilters')
 
         # acquire lock
         with LockWithAbort(self._lock_motion, self._abort_motion):
@@ -155,9 +165,12 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         if self._filter_wheel == FilterWheelModel.UNKNOWN:
             raise NotImplementedError
 
-        # get current position and status
-        position, _ = self._cam.get_filter_position_and_status()
-        return self._filter_names[position]
+        try:
+            self._position, _ = self._cam.get_filter_position_and_status()
+        except ValueError:
+            # use existing position
+            pass
+        return self._filter_names[self._position]
 
     def list_filters(self, *args, **kwargs) -> list:
         """List available filters.
