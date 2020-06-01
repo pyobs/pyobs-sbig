@@ -114,7 +114,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # reverse dict and search for name
         filters = {y: x for x, y in self._filter_names.items()}
         if filter_name not in filters:
-            raise ValueError('Unknown filter: %s', filter_name)
+            raise ValueError('Unknown filter: %s' % filter_name)
 
         # there already?
         position, status = self._cam.get_filter_position_and_status()
