@@ -1,7 +1,4 @@
-# distutils: language = c++
-
 import logging
-import threading
 from astropy.io import fits
 from pyobs.mixins import MotionStatusMixin
 

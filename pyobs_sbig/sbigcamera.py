@@ -1,8 +1,5 @@
-# distutils: language = c++
-
 import logging
 import math
-import threading
 from datetime import datetime
 from astropy.io import fits
 
