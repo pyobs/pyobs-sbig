@@ -1,9 +1,8 @@
-# distutils: language = c++
-
 import logging
 import math
-import threading
 from datetime import datetime
+from typing import Tuple
+
 from astropy.io import fits
 
 from pyobs.interfaces import ICamera, ICameraWindow, ICameraBinning, ICooling
@@ -68,7 +67,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         self._cam.binning = self._binning
         self._full_frame = (0, 0, *self._cam.full_frame)
 
-    def get_full_frame(self, *args, **kwargs) -> (int, int, int, int):
+    def get_full_frame(self, *args, **kwargs) -> Tuple[int, int, int, int]:
         """Returns full size of CCD.
 
         Returns:
@@ -76,7 +75,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         """
         return self._full_frame
 
-    def get_window(self, *args, **kwargs) -> (int, int, int, int):
+    def get_window(self, *args, **kwargs) -> Tuple[int, int, int, int]:
         """Returns the camera window.
 
         Returns:
@@ -84,7 +83,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         """
         return self._window
 
-    def get_binning(self, *args, **kwargs) -> dict:
+    def get_binning(self, *args, **kwargs) -> Tuple[int, int]:
         """Returns the camera binning.
 
         Returns:
@@ -142,14 +141,14 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         self._cam.window = (left, top, width, height)
 
         # set exposure time
-        self._cam.exposure_time = exposure_time / 1000.
+        self._cam.exposure_time = exposure_time
 
         # set exposing
         self._change_exposure_status(ICamera.ExposureStatus.EXPOSING)
 
         # get date obs
         log.info('Starting exposure with %s shutter for %.2f seconds...',
-                 'open' if open_shutter else 'closed', exposure_time / 1000.)
+                 'open' if open_shutter else 'closed', exposure_time)
         date_obs = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
 
         # init image
@@ -181,7 +180,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         # create FITS image and set header
         hdu = fits.PrimaryHDU(data)
         hdu.header['DATE-OBS'] = (date_obs, 'Date and time of start of exposure')
-        hdu.header['EXPTIME'] = (exposure_time / 1000., 'Exposure time [s]')
+        hdu.header['EXPTIME'] = (exposure_time, 'Exposure time [s]')
         hdu.header['DET-TEMP'] = (temp, 'CCD temperature [C]')
         hdu.header['DET-TSET'] = (setpoint, 'Cooler setpoint [C]')
 
@@ -230,7 +229,7 @@ class SbigCamera(BaseCamera, ICamera, ICameraWindow, ICameraBinning, ICooling):
         # do it
         self._cam.set_cooling(enabled, setpoint)
 
-    def get_cooling_status(self, *args, **kwargs) -> (bool,  float, float):
+    def get_cooling_status(self, *args, **kwargs) -> Tuple[bool, float, float]:
         """Returns the current status for the cooling.
 
         Returns:
