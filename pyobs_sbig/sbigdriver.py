@@ -23,7 +23,7 @@ class SbigDriver(Object):
         self.camera = SBIGCam()
 
         # filter wheel
-        self._filter_wheel = FilterWheelModel[filter_wheel]
+        self.filter_wheel = FilterWheelModel[filter_wheel]
 
         # active lock
         self._lock_active = threading.Lock()
@@ -36,10 +36,10 @@ class SbigDriver(Object):
         """
 
         # set filter wheel model
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+        if self.filter_wheel != FilterWheelModel.UNKNOWN:
             log.info('Initialising filter wheel...')
             try:
-                self.camera.set_filter_wheel(self._filter_wheel)
+                self.camera.set_filter_wheel(self.filter_wheel)
             except ValueError as e:
                 raise ValueError('Could not set filter wheel: %s' % str(e))
 
