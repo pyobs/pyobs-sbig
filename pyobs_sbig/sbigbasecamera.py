@@ -154,7 +154,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         data = self._img.data
 
         # temp & cooling
-        _, temp, setpoint, _ = self._cam.get_cooling()
+        _, temp, setpoint, _ = self._driver.camera.get_cooling()
 
         # create FITS image and set header
         hdu = fits.PrimaryHDU(data)
