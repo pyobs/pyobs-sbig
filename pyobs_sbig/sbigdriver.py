@@ -1,5 +1,4 @@
 import logging
-from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.object import Object
 
 from .sbigudrv import *
@@ -17,7 +16,7 @@ class SbigDriver(Object):
         Args:
             filter_wheel: Name of filter wheel, if any.
         """
-        BaseCamera.__init__(self, *args, **kwargs)
+        Object.__init__(self, *args, **kwargs)
 
         # create cam
         self.camera = SBIGCam()
