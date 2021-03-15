@@ -33,7 +33,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         if driver is None:
             self._driver = self._add_child_object(object_class=SbigDriver)
         else:
-            self._driver: SbigDriver = self._add_child_object(driver)
+            self._driver = driver
 
         # active sensor
         if isinstance(sensor, str):
