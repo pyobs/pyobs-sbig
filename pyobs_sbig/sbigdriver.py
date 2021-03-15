@@ -52,6 +52,9 @@ class SbigDriver(Object):
     def full_frame(self, sensor: ActiveSensor) -> Tuple[int, int, int, int]:
         """Return full frame."""
         with self._lock_active:
+            # TODO: maybe rethink this: should the camera return the full frame for the current binning and
+            # not for 1x1?
+            self.camera.binning = (1, 1)
             self.camera.sensor = sensor
             return self.camera.full_frame
 
