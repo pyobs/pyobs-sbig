@@ -1,4 +1,6 @@
 import logging
+from typing import List
+
 from astropy.io import fits
 from pyobs.mixins import MotionStatusMixin
 
@@ -160,7 +162,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             pass
         return self._filter_names[self._position]
 
-    def list_filters(self, *args, **kwargs) -> list:
+    def list_filters(self, *args, **kwargs) -> List[str]:
         """List available filters.
 
         Returns:
