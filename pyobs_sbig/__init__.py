@@ -1,3 +1,4 @@
+from .sbigbasecamera import SbigBaseCamera
 from .sbigdriver import SbigDriver
 from .sbigcamera import SbigCamera
 from .sbigtracker import SbigTracker
