@@ -8,8 +8,8 @@ from astropy.io import fits
 
 from pyobs.interfaces import ICamera, ICameraWindow
 from pyobs.modules.camera.basecamera import BaseCamera
-from .sbigdriver import SbigDriver
-from .sbigudrv import *
+from pyobs_sbig.sbigdriver import SbigDriver
+from pyobs_sbig.sbigudrv import *
 
 
 log = logging.getLogger(__name__)
