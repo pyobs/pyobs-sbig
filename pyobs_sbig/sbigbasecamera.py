@@ -8,6 +8,7 @@ from astropy.io import fits
 
 from pyobs.interfaces import ICamera, ICameraWindow
 from pyobs.modules.camera.basecamera import BaseCamera
+from pyobs.utils.enums import ExposureStatus
 from pyobs_sbig.sbigdriver import SbigDriver
 from pyobs_sbig.sbigudrv import *
 
@@ -118,7 +119,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         window = (left, top, width, height)
 
         # set exposing
-        self._change_exposure_status(ICamera.ExposureStatus.EXPOSING)
+        self._change_exposure_status(ExposureStatus.EXPOSING)
 
         # get date obs
         log.info('Starting exposure with for %.2f seconds...', exposure_time)
@@ -142,7 +143,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
 
         # wait for readout
         log.info('Exposure finished, reading out...')
-        self._change_exposure_status(ICamera.ExposureStatus.READOUT)
+        self._change_exposure_status(ExposureStatus.READOUT)
 
         # start readout (can raise ValueError)
         self._driver.readout(self._active_sensor, self._img, open_shutter)
@@ -182,7 +183,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
 
         # return FITS image
         log.info('Readout finished.')
-        self._change_exposure_status(ICamera.ExposureStatus.IDLE)
+        self._change_exposure_status(ExposureStatus.IDLE)
         return hdu
 
     def _abort_exposure(self):
@@ -191,7 +192,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         Raises:
             ValueError: If an error occured.
         """
-        self._change_exposure_status(ICamera.ExposureStatus.IDLE)
+        self._change_exposure_status(ExposureStatus.IDLE)
 
 
 __all__ = ['SbigBaseCamera']
