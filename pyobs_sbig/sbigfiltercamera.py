@@ -6,6 +6,7 @@ from pyobs.mixins import MotionStatusMixin
 
 from pyobs.events import FilterChangedEvent
 from pyobs.interfaces import IFilters, IMotion
+from pyobs.utils.enums import MotionStatus
 from pyobs.utils.threads import LockWithAbort
 
 from .sbigcamera import SbigCamera
@@ -55,7 +56,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         # init status of filter wheel
         if self._driver.filter_wheel != FilterWheelModel.UNKNOWN:
-            self._change_motion_status(IMotion.Status.POSITIONED, interface='IFilters')
+            self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
 
         # subscribe to events
         if self.comm:
@@ -113,7 +114,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             return
 
         # set status
-        self._change_motion_status(IMotion.Status.SLEWING, interface='IFilters')
+        self._change_motion_status(MotionStatus.SLEWING, interface='IFilters')
 
         # acquire lock
         with LockWithAbort(self._lock_motion, self._abort_motion):
@@ -138,7 +139,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             self.comm.send_event(FilterChangedEvent(filter_name))
 
         # set status
-        self._change_motion_status(IMotion.Status.POSITIONED, interface='IFilters')
+        self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
 
     def get_filter(self, *args, **kwargs) -> str:
         """Get currently set filter.
