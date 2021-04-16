@@ -1,3 +1,10 @@
+"""
+SBIG camera modules (pyobs_sbig)
+--------------------------------
+
+TODO: write doc
+"""
+
 from .sbigbasecamera import SbigBaseCamera
 from .sbigdriver import SbigDriver
 from .sbigcamera import SbigCamera
