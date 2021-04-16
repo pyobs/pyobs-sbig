@@ -32,7 +32,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
 
         # create driver?
         if driver is None:
-            self._driver = self._add_child_object(object_class=SbigDriver)
+            self._driver = self.add_child_object(object_class=SbigDriver)
         else:
             self._driver = driver
 
