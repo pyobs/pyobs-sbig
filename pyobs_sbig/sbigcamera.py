@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 
 class SbigCamera(SbigBaseCamera, ICameraBinning, ICooling):
     """A pyobs module for SBIG cameras."""
+    __module__ = 'pyobs_sbig'
 
     def __init__(self, setpoint: float = -20, *args, **kwargs):
         """Initializes a new SbigCamera.

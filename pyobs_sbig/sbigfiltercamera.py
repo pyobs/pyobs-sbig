@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 
 class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
     """A pyobs module for SBIG cameras."""
+    __module__ = 'pyobs_sbig'
 
     def __init__(self, filter_names: list = None, *args, **kwargs):
         """Initializes a new SbigCamera.
