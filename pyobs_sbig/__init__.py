@@ -1,9 +1,7 @@
 """
-SBIG camera modules (pyobs_sbig)
---------------------------------
-
 TODO: write doc
 """
+__title__ = 'SBIG camera modules'
 
 from .sbigbasecamera import SbigBaseCamera
 from .sbigdriver import SbigDriver
