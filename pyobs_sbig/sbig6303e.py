@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 
 class Sbig6303eCamera(SbigFilterCamera):
     """A pyobs module for SBIG6303e cameras."""
+    __module__ = 'pyobs_sbig'
 
     def _expose(self, exposure_time: int, open_shutter: bool, abort_event: threading.Event) -> fits.PrimaryHDU:
         """Actually do the exposure, should be implemented by derived classes.
