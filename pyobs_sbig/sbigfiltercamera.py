@@ -1,9 +1,12 @@
 import logging
+from typing import List
+
 from astropy.io import fits
 from pyobs.mixins import MotionStatusMixin
 
 from pyobs.events import FilterChangedEvent
 from pyobs.interfaces import IFilters, IMotion
+from pyobs.utils.enums import MotionStatus
 from pyobs.utils.threads import LockWithAbort
 
 from .sbigcamera import SbigCamera
@@ -15,18 +18,15 @@ log = logging.getLogger(__name__)
 
 class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
     """A pyobs module for SBIG cameras."""
+    __module__ = 'pyobs_sbig'
 
-    def __init__(self, filter_wheel: str = 'UNKNOWN', filter_names: list = None, *args, **kwargs):
+    def __init__(self, filter_names: list = None, *args, **kwargs):
         """Initializes a new SbigCamera.
 
         Args:
-            filter_wheel: Name of filter wheel used by the camera.
             filter_names: List of filter names.
         """
         SbigCamera.__init__(self, *args, **kwargs)
-
-        # filter wheel
-        self._filter_wheel = FilterWheelModel[filter_wheel]
 
         # and filter names
         if filter_names is None:
@@ -52,20 +52,12 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             ValueError: If cannot connect to camera or set filter wheel.
         """
 
-        # set filter wheel model
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
-            log.info('Initialising filter wheel...')
-            try:
-                self._cam.set_filter_wheel(self._filter_wheel)
-            except ValueError as e:
-                raise ValueError('Could not set filter wheel: %s' % str(e))
-
         # open camera
         SbigCamera.open(self)
 
         # init status of filter wheel
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
-            self._change_motion_status(IMotion.Status.POSITIONED, interface='IFilters')
+        if self._driver.filter_wheel != FilterWheelModel.UNKNOWN:
+            self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
 
         # subscribe to events
         if self.comm:
@@ -90,7 +82,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         hdu = SbigCamera._expose(self, exposure_time, open_shutter, abort_event)
 
         # add filter to FITS headers
-        if self._filter_wheel != FilterWheelModel.UNKNOWN:
+        if self._driver.filter_wheel != FilterWheelModel.UNKNOWN:
             hdu.header['FILTER'] = (self.get_filter(), 'Current filter')
 
         # finished
@@ -108,7 +100,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
 
         # do we have a filter wheel?
-        if self._filter_wheel == FilterWheelModel.UNKNOWN:
+        if self._driver.filter_wheel == FilterWheelModel.UNKNOWN:
             raise NotImplementedError
 
         # reverse dict and search for name
@@ -117,24 +109,24 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             raise ValueError('Unknown filter: %s' % filter_name)
 
         # there already?
-        position, status = self._cam.get_filter_position_and_status()
+        position, status = self._driver.camera.get_filter_position_and_status()
         if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
             log.info('Filter changed.')
             return
 
         # set status
-        self._change_motion_status(IMotion.Status.SLEWING, interface='IFilters')
+        self._change_motion_status(MotionStatus.SLEWING, interface='IFilters')
 
         # acquire lock
         with LockWithAbort(self._lock_motion, self._abort_motion):
             # set it
             log.info('Changing filter to %s...', filter_name)
-            self._cam.set_filter(filters[filter_name])
+            self._driver.camera.set_filter(filters[filter_name])
 
             # wait for it
             while True:
                 # break, if wheel is idle and filter is set
-                position, status = self._cam.get_filter_position_and_status()
+                position, status = self._driver.camera.get_filter_position_and_status()
                 if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
                     break
 
@@ -148,7 +140,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             self.comm.send_event(FilterChangedEvent(filter_name))
 
         # set status
-        self._change_motion_status(IMotion.Status.POSITIONED, interface='IFilters')
+        self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
 
     def get_filter(self, *args, **kwargs) -> str:
         """Get currently set filter.
@@ -162,17 +154,17 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
 
         # do we have a filter wheel?
-        if self._filter_wheel == FilterWheelModel.UNKNOWN:
+        if self._driver.filter_wheel == FilterWheelModel.UNKNOWN:
             raise NotImplementedError
 
         try:
-            self._position, _ = self._cam.get_filter_position_and_status()
+            self._position, _ = self._driver.camera.get_filter_position_and_status()
         except ValueError:
             # use existing position
             pass
         return self._filter_names[self._position]
 
-    def list_filters(self, *args, **kwargs) -> list:
+    def list_filters(self, *args, **kwargs) -> List[str]:
         """List available filters.
 
         Returns:
@@ -183,7 +175,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
 
         # do we have a filter wheel?
-        if self._filter_wheel == FilterWheelModel.UNKNOWN:
+        if self._driver.filter_wheel == FilterWheelModel.UNKNOWN:
             raise NotImplementedError
 
         # return names

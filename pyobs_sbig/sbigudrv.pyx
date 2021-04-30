@@ -3,6 +3,8 @@ import threading
 import time
 from enum import Enum
 from contextlib import contextmanager
+from typing import Tuple
+
 import numpy as np
 cimport numpy as np
 np.import_array()
@@ -67,6 +69,12 @@ class FilterWheelStatus(Enum):
     BUSY = CFW_STATUS.CFWS_BUSY
 
 
+class ActiveSensor(Enum):
+    IMAGING = CCD_REQUEST.CCD_IMAGING
+    TRACKING = CCD_REQUEST.CCD_TRACKING
+    EXT_TRACKING = CCD_REQUEST.CCD_EXT_TRACKING
+
+
 cdef class SBIGImg:
     cdef CSBIGImg* obj
 
@@ -116,6 +124,16 @@ cdef class SBIGCam:
             raise ValueError(self.obj.GetErrorString(res))
 
     @property
+    def sensor(self) -> ActiveSensor:
+        with acquire_lock(self.lock):
+            return ActiveSensor(self.obj.GetActiveCCD())
+
+    @sensor.setter
+    def sensor(self, camera: ActiveSensor):
+        with acquire_lock(self.lock):
+            self.obj.SetActiveCCD(camera.value)
+
+    @property
     def readout_mode(self):
         with acquire_lock(self.lock):
             return self.obj.GetReadoutMode()
@@ -126,7 +144,7 @@ cdef class SBIGCam:
             self.obj.SetReadoutMode(rm)
 
     @property
-    def full_frame(self):
+    def full_frame(self) -> Tuple[int, int]:
         # define width and height
         cdef int width = 0
         cdef int height = 0
@@ -137,7 +155,7 @@ cdef class SBIGCam:
             res = self.obj.GetFullFrame(width, height)
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(res))
-            return width, height
+            return 0, 0, width, height
 
     @property
     def window(self):
@@ -236,7 +254,7 @@ cdef class SBIGCam:
     def was_aborted(self):
         return self.aborted
 
-    def expose(self, img: SBIGImg, shutter: bool):
+    def start_exposure(self, img: SBIGImg, shutter: bool):
          # define vars
         cdef MY_LOGICAL complete = 0
 
@@ -262,24 +280,28 @@ cdef class SBIGCam:
             shutter_cmd = SHUTTER_COMMAND.SC_OPEN_SHUTTER if shutter else  SHUTTER_COMMAND.SC_CLOSE_SHUTTER
             res = self.obj.StartExposure(shutter_cmd)
             if res != 0:
-                raise ValueError(self.obj.GetErrorString(res))
+                raise ValueError('Could not start exposure: ' + self.obj.GetErrorString(res))
 
-            # wait for exposure
-            while True:
-                # is complete?
-                res = self.obj.IsExposureComplete(complete)
+    def has_exposure_finished(self):
+         # define vars
+        cdef MY_LOGICAL complete = 0
 
-                # break on error or if complete or aborted
-                if res != 0  or complete or self.aborted:
-                    break
+        # acquire lock
+        with acquire_lock(self.lock):
+            # is complete?
+            res = self.obj.IsExposureComplete(complete)
+            if res != 0:
+                raise ValueError('Could not get exposure status: ' + self.obj.GetErrorString(res))
 
-                # sleep a little
-                time.sleep(0.1)
+            # break on error or if complete or aborted
+            return res != 0 or complete
 
-            # end exposure
+    def end_exposure(self):
+        # acquire lock
+        with acquire_lock(self.lock):
             res = self.obj.EndExposure()
             if res != 0:
-                raise ValueError(self.obj.GetErrorString(res))
+                raise ValueError('Could not end exposure: ' + self.obj.GetErrorString(res))
 
     @staticmethod
     cdef int _readout(CSBIGCam *cam, CSBIGImg *img, SBIG_DARK_FRAME mode) nogil:

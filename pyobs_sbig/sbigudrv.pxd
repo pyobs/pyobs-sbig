@@ -139,6 +139,9 @@ cdef extern from "../src/csbigcam.h":
     ctypedef enum CFW_STATUS:
         CFWS_UNKNOWN, CFWS_IDLE, CFWS_BUSY
 
+    ctypedef enum CCD_REQUEST:
+        CCD_IMAGING, CCD_TRACKING, CCD_EXT_TRACKING
+
     cdef cppclass CSBIGCam:
         CSBIGCam(int type)
 
@@ -149,6 +152,10 @@ cdef extern from "../src/csbigcam.h":
         #string 		GetErrorString()
         string 		GetErrorString(PAR_ERROR err)
         #PAR_COMMAND GetCommand()
+
+        # active
+        CCD_REQUEST GetActiveCCD()
+        void SetActiveCCD(CCD_REQUEST)
 
         # Setters /Getters
         unsigned short GetFirmwareVersion()
