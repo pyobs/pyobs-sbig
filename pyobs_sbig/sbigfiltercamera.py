@@ -20,13 +20,13 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
-    def __init__(self, filter_names: list = None, *args, **kwargs):
+    def __init__(self, filter_wheel: str, filter_names: list = None, *args, **kwargs):
         """Initializes a new SbigCamera.
 
         Args:
             filter_names: List of filter names.
         """
-        SbigCamera.__init__(self, *args, **kwargs)
+        SbigCamera.__init__(self, *args, **kwargs, driver_kwargs=dict(filter_wheel=filter_wheel))
 
         # and filter names
         if filter_names is None:

@@ -20,24 +20,23 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
-    def __init__(self, sensor: Union[str, ActiveSensor] = ActiveSensor.IMAGING, driver: Union[dict, SbigDriver] = None,
-                 *args, **kwargs):
+    def __init__(self, sensor: Union[str, ActiveSensor] = ActiveSensor.IMAGING, driver: SbigDriver = None,
+                 driver_kwargs: dict = None, *args, **kwargs):
         """Initializes a new SbigCamera.
 
         Args:
             sensor: Sensor to use, if camera has more than one.
-            driver: Driver to use, if any.
+            driver_kwargs: kwargs for driver.
 
         """
         BaseCamera.__init__(self, *args, **kwargs)
 
         # create driver?
-        if driver is None or isinstance(driver, dict):
-            self._driver = self.add_child_object(driver, SbigDriver)
-        elif isinstance(driver, SbigDriver):
+        if driver is not None:
             self._driver = driver
         else:
-            raise ValueError('Invalid driver.')
+            driver_kwargs = {} if driver_kwargs is None else driver_kwargs
+            self._driver = self.add_child_object(object_class=SbigDriver, **driver_kwargs)
 
         # active sensor
         if isinstance(sensor, str):
