@@ -1,6 +1,6 @@
 import logging
 
-from pyobs.interfaces import ICameraBinning, ICooling
+from pyobs.interfaces import IBinning, ICooling
 from .sbigbasecamera import SbigBaseCamera
 from .sbigudrv import *
 
@@ -8,7 +8,7 @@ from .sbigudrv import *
 log = logging.getLogger(__name__)
 
 
-class SbigCamera(SbigBaseCamera, ICameraBinning, ICooling):
+class SbigCamera(SbigBaseCamera, IBinning, ICooling):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
