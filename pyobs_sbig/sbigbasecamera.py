@@ -1,12 +1,10 @@
 import logging
 import math
-import threading
 from datetime import datetime
-from typing import Tuple, Union
-
+from typing import Union
 from astropy.io import fits
 
-from pyobs.interfaces import ICamera, ICameraWindow
+from pyobs.interfaces import ICamera, IWindow
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
 from pyobs_sbig.sbigdriver import SbigDriver
@@ -16,7 +14,7 @@ from pyobs_sbig.sbigudrv import *
 log = logging.getLogger(__name__)
 
 
-class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
+class SbigBaseCamera(BaseCamera, ICamera, IWindow):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
