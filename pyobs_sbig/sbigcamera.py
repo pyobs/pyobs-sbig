@@ -85,7 +85,7 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
 
         try:
             enabled, temp, setpoint, power = self._driver.camera.get_cooling()
-            self._cooling = enabled, setpoint, power
+            self._cooling = enabled, setpoint, power * 100.
         except ValueError:
             # use existing cooling
             pass
