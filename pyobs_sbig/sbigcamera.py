@@ -22,6 +22,7 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
 
         # cooling
         self._setpoint = setpoint
+        self._cooling = None
 
     def open(self):
         """Open module.
@@ -83,8 +84,8 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
         """
 
         try:
-            enabled, temp, setpoint, _ = self._driver.camera.get_cooling()
-            self._cooling = enabled, temp, setpoint
+            enabled, temp, setpoint, power = self._driver.camera.get_cooling()
+            self._cooling = enabled, setpoint, power
         except ValueError:
             # use existing cooling
             pass
