@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Tuple, Dict
 
 from pyobs.interfaces import IBinning, ICooling
 from .sbigbasecamera import SbigBaseCamera
@@ -12,19 +13,19 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
-    def __init__(self, setpoint: float = -20, *args, **kwargs):
+    def __init__(self, setpoint: float = -20, **kwargs: Any):
         """Initializes a new SbigCamera.
 
         Args:
             setpoint: Cooling temperature setpoint.
         """
-        SbigBaseCamera.__init__(self, *args, **kwargs)
+        SbigBaseCamera.__init__(self, **kwargs)
 
         # cooling
         self._setpoint = setpoint
         self._cooling = None
 
-    def open(self):
+    def open(self) -> None:
         """Open module.
 
         Raises:
@@ -35,7 +36,7 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
         # cooling
         self.set_cooling(self._setpoint is not None, self._setpoint)
 
-    def get_binning(self, *args, **kwargs) -> Tuple[int, int]:
+    def get_binning(self, **kwargs: Any) -> Tuple[int, int]:
         """Returns the camera binning.
 
         Returns:
@@ -43,7 +44,7 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
         """
         return self._binning
 
-    def set_binning(self, x: int, y: int, *args, **kwargs):
+    def set_binning(self, x: int, y: int, **kwargs: Any) -> None:
         """Set the camera binning.
 
         Args:
@@ -53,7 +54,7 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
         self._binning = (x, y)
         log.info('Setting binning to %dx%d...', x, y)
 
-    def set_cooling(self, enabled: bool, setpoint: float, *args, **kwargs):
+    def set_cooling(self, enabled: bool, setpoint: float, **kwargs: Any) -> None:
         """Enables/disables cooling and sets setpoint.
 
         Args:
@@ -73,7 +74,7 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
         # do it
         self._driver.camera.set_cooling(enabled, setpoint)
 
-    def get_cooling_status(self, *args, **kwargs) -> Tuple[bool, float, float]:
+    def get_cooling_status(self, **kwargs: Any) -> Tuple[bool, float, float]:
         """Returns the current status for the cooling.
 
         Returns:
@@ -85,13 +86,13 @@ class SbigCamera(SbigBaseCamera, IBinning, ICooling):
 
         try:
             enabled, temp, setpoint, power = self._driver.camera.get_cooling()
-            self._cooling = enabled, setpoint, power * 100.
+            self._cooling = enabled is True, setpoint, power * 100.
         except ValueError:
             # use existing cooling
             pass
         return self._cooling
 
-    def get_temperatures(self, *args, **kwargs) -> dict:
+    def get_temperatures(self, **kwargs: Any) -> Dict[str, float]:
         """Returns all temperatures measured by this module.
 
         Returns:

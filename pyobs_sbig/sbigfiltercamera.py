@@ -1,16 +1,16 @@
 import logging
-from typing import List
+import threading
+from typing import List, Optional, Any
 
-from astropy.io import fits
+from pyobs.images import Image
 from pyobs.mixins import MotionStatusMixin
-
 from pyobs.events import FilterChangedEvent
-from pyobs.interfaces import IFilters, IMotion
+from pyobs.interfaces import IFilters
 from pyobs.utils.enums import MotionStatus
 from pyobs.utils.threads import LockWithAbort
 
 from .sbigcamera import SbigCamera
-from .sbigudrv import *
+from .sbigudrv import FilterWheelPosition, FilterWheelStatus, FilterWheelModel
 
 
 log = logging.getLogger(__name__)
@@ -20,13 +20,13 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
-    def __init__(self, filter_wheel: str, filter_names: list = None, *args, **kwargs):
+    def __init__(self, filter_wheel: str, filter_names: Optional[List[str]] = None, **kwargs: Any):
         """Initializes a new SbigCamera.
 
         Args:
             filter_names: List of filter names.
         """
-        SbigCamera.__init__(self, *args, **kwargs, driver_kwargs=dict(filter_wheel=filter_wheel))
+        SbigCamera.__init__(self, **kwargs, driver_kwargs=dict(filter_wheel=filter_wheel))
 
         # and filter names
         if filter_names is None:
@@ -43,9 +43,9 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         self._position = FilterWheelPosition.UNKNOWN
 
         # init mixins
-        MotionStatusMixin.__init__(self, *args, **kwargs, motion_status_interfaces=['IFilters'])
+        MotionStatusMixin.__init__(self, **kwargs, motion_status_interfaces=['IFilters'])
 
-    def open(self):
+    def open(self) -> None:
         """Open module.
 
         Raises:
@@ -63,7 +63,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         if self.comm:
             self.comm.register_event(FilterChangedEvent)
 
-    def _expose(self, exposure_time: int, open_shutter: bool, abort_event: threading.Event) -> fits.PrimaryHDU:
+    def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
@@ -79,16 +79,16 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
 
         # do expsure
-        hdu = SbigCamera._expose(self, exposure_time, open_shutter, abort_event)
+        img = SbigCamera._expose(self, exposure_time, open_shutter, abort_event)
 
         # add filter to FITS headers
         if self._driver.filter_wheel != FilterWheelModel.UNKNOWN:
-            hdu.header['FILTER'] = (self.get_filter(), 'Current filter')
+            img.header['FILTER'] = (self.get_filter(), 'Current filter')
 
         # finished
-        return hdu
+        return img
 
-    def set_filter(self, filter_name: str, *args, **kwargs):
+    def set_filter(self, filter_name: str, **kwargs: Any) -> None:
         """Set the current filter.
 
         Args:
@@ -142,7 +142,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # set status
         self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
 
-    def get_filter(self, *args, **kwargs) -> str:
+    def get_filter(self, **kwargs: Any) -> str:
         """Get currently set filter.
 
         Returns:
@@ -164,7 +164,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             pass
         return self._filter_names[self._position]
 
-    def list_filters(self, *args, **kwargs) -> List[str]:
+    def list_filters(self, **kwargs: Any) -> List[str]:
         """List available filters.
 
         Returns:
