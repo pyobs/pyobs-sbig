@@ -37,7 +37,7 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         else:
             driver_kwargs = {} if driver_kwargs is None else driver_kwargs
             self._driver = self.add_child_object({'class': 'pyobs_sbig.SbigDriver'},
-                                                 object_class=SbigDriver, kwargs=driver_kwargs)
+                                                 object_class=SbigDriver, **driver_kwargs)
 
         # active sensor
         if isinstance(sensor, str):
