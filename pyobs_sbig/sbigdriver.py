@@ -1,4 +1,6 @@
 import logging
+from typing import Any, Optional
+
 from pyobs.object import Object
 
 from .sbigudrv import *
@@ -10,13 +12,13 @@ log = logging.getLogger(__name__)
 class SbigDriver(Object):
     """The underlying driver for the pyobs SBIG modules."""
 
-    def __init__(self, filter_wheel: str = 'UNKNOWN', *args, **kwargs):
+    def __init__(self, filter_wheel: str = 'UNKNOWN', **kwargs: Any):
         """Initializes a new SbigCamera.
 
         Args:
             filter_wheel: Name of filter wheel, if any.
         """
-        Object.__init__(self, *args, **kwargs)
+        Object.__init__(self, **kwargs)
 
         # create cam
         self.camera = SBIGCam()
@@ -27,7 +29,7 @@ class SbigDriver(Object):
         # active lock
         self._lock_active = threading.Lock()
 
-    def open(self):
+    def open(self) -> None:
         """Open module.
 
         Raises:
@@ -59,7 +61,8 @@ class SbigDriver(Object):
             return self.camera.full_frame
 
     def start_exposure(self, sensor: ActiveSensor, img: SBIGImg, shutter: bool, exposure_time: float,
-                       window: Tuple[int, int, int, int] = None, binning: Tuple[int, int] = None):
+                       window: Optional[Tuple[int, int, int, int]] = None,
+                       binning: Optional[Tuple[int, int]] = None) -> None:
         """Start an exposure.
 
         Args:
@@ -97,13 +100,13 @@ class SbigDriver(Object):
             self.camera.sensor = sensor
             return self.camera.has_exposure_finished()
 
-    def end_exposure(self, sensor: ActiveSensor):
+    def end_exposure(self, sensor: ActiveSensor) -> None:
         """End an exposure."""
         with self._lock_active:
             self.camera.sensor = sensor
             return self.camera.end_exposure()
 
-    def readout(self, sensor: ActiveSensor, img: SBIGImg, shutter: bool):
+    def readout(self, sensor: ActiveSensor, img: SBIGImg, shutter: bool) -> None:
         """Readout image.
 
         Args:

@@ -1,12 +1,12 @@
 import logging
 import math
-import threading
 from datetime import datetime
-from typing import Tuple, Union
+from typing import Union, Any, Optional, Dict, Tuple
+import threading
+import numpy as np
 
-from astropy.io import fits
-
-from pyobs.interfaces import ICamera, ICameraWindow
+from pyobs.images import Image
+from pyobs.interfaces import ICamera, IWindow
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
 from pyobs_sbig.sbigdriver import SbigDriver
@@ -16,26 +16,28 @@ from pyobs_sbig.sbigudrv import *
 log = logging.getLogger(__name__)
 
 
-class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
+class SbigBaseCamera(BaseCamera, ICamera, IWindow):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
-    def __init__(self, sensor: Union[str, ActiveSensor] = ActiveSensor.IMAGING, driver: SbigDriver = None,
-                 *args, **kwargs):
+    def __init__(self, sensor: Union[str, ActiveSensor] = ActiveSensor.IMAGING, driver: Optional[SbigDriver] = None,
+                 driver_kwargs: Optional[Dict[str, Any]] = None, **kwargs: Any):
         """Initializes a new SbigCamera.
 
         Args:
             sensor: Sensor to use, if camera has more than one.
-            driver: Driver to use, if any.
+            driver_kwargs: kwargs for driver.
 
         """
-        BaseCamera.__init__(self, *args, **kwargs)
+        BaseCamera.__init__(self, **kwargs)
 
         # create driver?
-        if driver is None:
-            self._driver = self.add_child_object(object_class=SbigDriver)
-        else:
+        if driver is not None:
             self._driver = driver
+        else:
+            driver_kwargs = {} if driver_kwargs is None else driver_kwargs
+            self._driver = self.add_child_object({'class': 'pyobs_sbig.SbigDriver'},
+                                                 object_class=SbigDriver, **driver_kwargs)
 
         # active sensor
         if isinstance(sensor, str):
@@ -49,11 +51,11 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         self._img = SBIGImg()
 
         # window and binning
-        self._full_frame = None
-        self._window = None
+        self._full_frame = (0, 0, 0, 0)
+        self._window = (0, 0, 0, 0)
         self._binning = (1, 1)
 
-    def open(self):
+    def open(self) -> None:
         """Open module.
 
         Raises:
@@ -64,7 +66,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         # get window
         self._window = self.get_full_frame()
 
-    def get_full_frame(self, *args, **kwargs) -> Tuple[int, int, int, int]:
+    def get_full_frame(self, **kwargs: Any) -> Tuple[int, int, int, int]:
         """Returns full size of CCD.
 
         Returns:
@@ -72,7 +74,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         """
         return self._driver.full_frame(self._active_sensor)
 
-    def get_window(self, *args, **kwargs) -> Tuple[int, int, int, int]:
+    def get_window(self, **kwargs: Any) -> Tuple[int, int, int, int]:
         """Returns the camera window.
 
         Returns:
@@ -80,7 +82,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         """
         return self._window
 
-    def set_window(self, left: int, top: int, width: int, height: int, *args, **kwargs):
+    def set_window(self, left: int, top: int, width: int, height: int, **kwargs: Any) -> None:
         """Set the camera window.
 
         Args:
@@ -92,7 +94,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         self._window = (left, top, width, height)
         log.info('Setting window to %dx%d at %d,%d...', width, height, left, top)
 
-    def _expose(self, exposure_time: int, open_shutter: bool, abort_event: threading.Event) -> fits.PrimaryHDU:
+    def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
@@ -137,7 +139,7 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         while not self._driver.has_exposure_finished(self._active_sensor):
             # was aborted?
             if abort_event.is_set():
-                return None
+                raise ValueError('Exposure aborted.')
 
         # finish exposure
         self._driver.end_exposure(self._active_sensor)
@@ -159,35 +161,35 @@ class SbigBaseCamera(BaseCamera, ICamera, ICameraWindow):
         _, temp, setpoint, _ = self._driver.camera.get_cooling()
 
         # create FITS image and set header
-        hdu = fits.PrimaryHDU(data)
-        hdu.header['DATE-OBS'] = (date_obs, 'Date and time of start of exposure')
-        hdu.header['EXPTIME'] = (exposure_time, 'Exposure time [s]')
-        hdu.header['DET-TEMP'] = (temp, 'CCD temperature [C]')
-        hdu.header['DET-TSET'] = (setpoint, 'Cooler setpoint [C]')
+        img = Image(data)
+        img.header['DATE-OBS'] = (date_obs, 'Date and time of start of exposure')
+        img.header['EXPTIME'] = (exposure_time, 'Exposure time [s]')
+        img.header['DET-TEMP'] = (temp, 'CCD temperature [C]')
+        img.header['DET-TSET'] = (setpoint, 'Cooler setpoint [C]')
 
         # binning
-        hdu.header['XBINNING'] = hdu.header['DET-BIN1'] = (self._binning[0], 'Binning factor used on X axis')
-        hdu.header['YBINNING'] = hdu.header['DET-BIN2'] = (self._binning[1], 'Binning factor used on Y axis')
+        img.header['XBINNING'] = img.header['DET-BIN1'] = (self._binning[0], 'Binning factor used on X axis')
+        img.header['YBINNING'] = img.header['DET-BIN2'] = (self._binning[1], 'Binning factor used on Y axis')
 
         # window
-        hdu.header['XORGSUBF'] = (self._window[0], 'Subframe origin on X axis')
-        hdu.header['YORGSUBF'] = (self._window[1], 'Subframe origin on Y axis')
+        img.header['XORGSUBF'] = (self._window[0], 'Subframe origin on X axis')
+        img.header['YORGSUBF'] = (self._window[1], 'Subframe origin on Y axis')
 
         # statistics
-        hdu.header['DATAMIN'] = (float(np.min(data)), 'Minimum data value')
-        hdu.header['DATAMAX'] = (float(np.max(data)), 'Maximum data value')
-        hdu.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
+        img.header['DATAMIN'] = (float(np.min(data)), 'Minimum data value')
+        img.header['DATAMAX'] = (float(np.max(data)), 'Maximum data value')
+        img.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
 
         # biassec/trimsec
         frame = self.get_full_frame()
-        self.set_biassec_trimsec(hdu.header, *frame)
+        self.set_biassec_trimsec(img.header, *frame)
 
         # return FITS image
         log.info('Readout finished.')
         self._change_exposure_status(ExposureStatus.IDLE)
-        return hdu
+        return img
 
-    def _abort_exposure(self):
+    def _abort_exposure(self) -> None:
         """Abort the running exposure. Should be implemented by derived class.
 
         Raises:
