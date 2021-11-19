@@ -4,7 +4,12 @@ version = "0.14.0"
 description = "pyobs module for SBIG cameras"
 authors = ["Tim-Oliver Husser <thusser@uni-goettingen.de>"]
 license = "MIT"
-build = 'build.py'
+include = ['src']
+#build = 'build.py'
+
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = false
 
 [tool.poetry.dependencies]
 python = "^3.7"
@@ -14,5 +19,5 @@ astropy = "^4.2"
 [tool.poetry.dev-dependencies]
 
 [build-system]
-requires = ["poetry-core>=1.0.0", "Cython>=0.29.0", "numpy>=1.21.0"]
+requires = ["poetry-core>=1.0.0", "Cython>=0.29.0", "numpy>=1.21.0", "setuptools"]
 build-backend = "poetry.core.masonry.api"
