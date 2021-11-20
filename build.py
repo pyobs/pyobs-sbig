@@ -29,11 +29,11 @@ def build():
             "build_ext": cython_build_ext,
         },
     })
-    distribution.package_dir = "extended"
+    #distribution.package_dir = "extended"
 
     distribution.run_command("build_ext")
     build_ext_cmd = distribution.get_command_obj("build_ext")
-    #build_ext_cmd.copy_extensions_to_source()
+    build_ext_cmd.copy_extensions_to_source()
 
 
 if __name__ == "__main__":
