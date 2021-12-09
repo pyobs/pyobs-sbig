@@ -1,9 +1,8 @@
+import asyncio
 import logging
 import math
 from datetime import datetime
-from typing import Union, Any, Optional, Dict, Tuple
-import threading
-import numpy as np
+from typing import Union, Any, Optional, Dict
 
 from pyobs.images import Image
 from pyobs.interfaces import ICamera, IWindow
@@ -55,18 +54,18 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         self._window = (0, 0, 0, 0)
         self._binning = (1, 1)
 
-    def open(self) -> None:
+    async def open(self) -> None:
         """Open module.
 
         Raises:
             ValueError: If cannot connect to camera or set filter wheel.
         """
-        BaseCamera.open(self)
+        await BaseCamera.open(self)
 
         # get window
-        self._window = self.get_full_frame()
+        self._window = await self.get_full_frame()
 
-    def get_full_frame(self, **kwargs: Any) -> Tuple[int, int, int, int]:
+    async def get_full_frame(self, **kwargs: Any) -> Tuple[int, int, int, int]:
         """Returns full size of CCD.
 
         Returns:
@@ -74,7 +73,7 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         """
         return self._driver.full_frame(self._active_sensor)
 
-    def get_window(self, **kwargs: Any) -> Tuple[int, int, int, int]:
+    async def get_window(self, **kwargs: Any) -> Tuple[int, int, int, int]:
         """Returns the camera window.
 
         Returns:
@@ -82,7 +81,7 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         """
         return self._window
 
-    def set_window(self, left: int, top: int, width: int, height: int, **kwargs: Any) -> None:
+    async def set_window(self, left: int, top: int, width: int, height: int, **kwargs: Any) -> None:
         """Set the camera window.
 
         Args:
@@ -94,7 +93,7 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         self._window = (left, top, width, height)
         log.info('Setting window to %dx%d at %d,%d...', width, height, left, top)
 
-    def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
+    async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: asyncio.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
@@ -121,9 +120,6 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
                  self._window[2], self._window[3], width, height, left, top)
         window = (left, top, width, height)
 
-        # set exposing
-        self._change_exposure_status(ExposureStatus.EXPOSING)
-
         # get date obs
         log.info('Starting exposure with for %.2f seconds...', exposure_time)
         date_obs = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
@@ -140,16 +136,18 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
             # was aborted?
             if abort_event.is_set():
                 raise ValueError('Exposure aborted.')
+            await asyncio.sleep(0.01)
 
         # finish exposure
         self._driver.end_exposure(self._active_sensor)
 
         # wait for readout
         log.info('Exposure finished, reading out...')
-        self._change_exposure_status(ExposureStatus.READOUT)
+        await self._change_exposure_status(ExposureStatus.READOUT)
 
         # start readout (can raise ValueError)
-        self._driver.readout(self._active_sensor, self._img, open_shutter)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._driver.readout, self._active_sensor, self._img, open_shutter)
 
         # finalize image
         self._img.image_can_close = True
@@ -158,7 +156,7 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         data = self._img.data
 
         # temp & cooling
-        _, temp, setpoint, _ = self._driver.camera.get_cooling()
+        _, temp, setpoint, _ = await self._driver.camera.get_cooling()
 
         # create FITS image and set header
         img = Image(data)
@@ -181,21 +179,20 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         img.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
 
         # biassec/trimsec
-        frame = self.get_full_frame()
+        frame = await self.get_full_frame()
         self.set_biassec_trimsec(img.header, *frame)
 
         # return FITS image
         log.info('Readout finished.')
-        self._change_exposure_status(ExposureStatus.IDLE)
         return img
 
-    def _abort_exposure(self) -> None:
+    async def _abort_exposure(self) -> None:
         """Abort the running exposure. Should be implemented by derived class.
 
         Raises:
             ValueError: If an error occured.
         """
-        self._change_exposure_status(ExposureStatus.IDLE)
+        await self._change_exposure_status(ExposureStatus.IDLE)
 
 
 __all__ = ['SbigBaseCamera']

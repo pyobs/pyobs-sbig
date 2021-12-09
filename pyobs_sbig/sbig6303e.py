@@ -12,7 +12,7 @@ class Sbig6303eCamera(SbigFilterCamera):
     """A pyobs module for SBIG6303e cameras."""
     __module__ = 'pyobs_sbig'
 
-    def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
+    async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
@@ -28,10 +28,10 @@ class Sbig6303eCamera(SbigFilterCamera):
         """
 
         # do expsure
-        img = SbigFilterCamera._expose(self, exposure_time, open_shutter, abort_event)
+        img = await SbigFilterCamera._expose(self, exposure_time, open_shutter, abort_event)
 
         # get binning
-        xbin, ybin = self.get_binning()
+        xbin, ybin = await self.get_binning()
 
         # gain is different in binned images
         gain = (1.4, 'Detector gain [e-/ADU]') if xbin == ybin == 1 else (2.3, 'Detector gain [e-/ADU]')

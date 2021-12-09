@@ -45,7 +45,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # init mixins
         MotionStatusMixin.__init__(self, **kwargs, motion_status_interfaces=['IFilters'])
 
-    def open(self) -> None:
+    async def open(self) -> None:
         """Open module.
 
         Raises:
@@ -53,17 +53,17 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
 
         # open camera
-        SbigCamera.open(self)
+        await SbigCamera.open(self)
 
         # init status of filter wheel
         if self._driver.filter_wheel != FilterWheelModel.UNKNOWN:
-            self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
+            await self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
 
         # subscribe to events
         if self.comm:
-            self.comm.register_event(FilterChangedEvent)
+            await self.comm.register_event(FilterChangedEvent)
 
-    def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
+    async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
@@ -79,7 +79,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
 
         # do expsure
-        img = SbigCamera._expose(self, exposure_time, open_shutter, abort_event)
+        img = await SbigCamera._expose(self, exposure_time, open_shutter, abort_event)
 
         # add filter to FITS headers
         if self._driver.filter_wheel != FilterWheelModel.UNKNOWN:
@@ -88,7 +88,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # finished
         return img
 
-    def set_filter(self, filter_name: str, **kwargs: Any) -> None:
+    async def set_filter(self, filter_name: str, **kwargs: Any) -> None:
         """Set the current filter.
 
         Args:
@@ -115,7 +115,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             return
 
         # set status
-        self._change_motion_status(MotionStatus.SLEWING, interface='IFilters')
+        await self._change_motion_status(MotionStatus.SLEWING, interface='IFilters')
 
         # acquire lock
         with LockWithAbort(self._lock_motion, self._abort_motion):
@@ -140,9 +140,9 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             self.comm.send_event(FilterChangedEvent(filter_name))
 
         # set status
-        self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
+        await self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
 
-    def get_filter(self, **kwargs: Any) -> str:
+    async def get_filter(self, **kwargs: Any) -> str:
         """Get currently set filter.
 
         Returns:
@@ -164,7 +164,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             pass
         return self._filter_names[self._position]
 
-    def list_filters(self, **kwargs: Any) -> List[str]:
+    async def list_filters(self, **kwargs: Any) -> List[str]:
         """List available filters.
 
         Returns:
