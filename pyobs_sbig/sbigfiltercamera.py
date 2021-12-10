@@ -83,7 +83,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         # add filter to FITS headers
         if self._driver.filter_wheel != FilterWheelModel.UNKNOWN:
-            img.header['FILTER'] = (self.get_filter(), 'Current filter')
+            img.header['FILTER'] = (await self.get_filter(), 'Current filter')
 
         # finished
         return img

@@ -156,7 +156,7 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         data = self._img.data
 
         # temp & cooling
-        _, temp, setpoint, _ = await self._driver.camera.get_cooling()
+        _, temp, setpoint, _ = self._driver.camera.get_cooling()
 
         # create FITS image and set header
         img = Image(data)
