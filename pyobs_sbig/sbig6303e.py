@@ -1,5 +1,6 @@
 import logging
 import threading
+from typing import Any, Optional
 
 from pyobs.images import Image
 from .sbigfiltercamera import SbigFilterCamera
@@ -39,6 +40,18 @@ class Sbig6303eCamera(SbigFilterCamera):
 
         # finished
         return img
+
+    async def init(self, **kwargs: Any) -> None:
+        pass
+
+    async def park(self, **kwargs: Any) -> None:
+        pass
+
+    async def stop_motion(self, device: Optional[str] = None, **kwargs: Any) -> None:
+        pass
+
+    async def is_ready(self, **kwargs: Any) -> bool:
+        return True
 
 
 __all__ = ['Sbig6303eCamera']
