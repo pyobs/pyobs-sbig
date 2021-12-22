@@ -181,5 +181,17 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # return names
         return [f for f in self._filter_names.values() if f is not None]
 
+    async def init(self, **kwargs: Any) -> None:
+        pass
+
+    async def park(self, **kwargs: Any) -> None:
+        pass
+
+    async def stop_motion(self, device: Optional[str] = None, **kwargs: Any) -> None:
+        pass
+
+    async def is_ready(self, **kwargs: Any) -> bool:
+        return True
+
 
 __all__ = ['SbigFilterCamera']
