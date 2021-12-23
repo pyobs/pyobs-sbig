@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import threading
 from typing import List, Optional, Any
 
 from pyobs.images import Image
@@ -36,8 +36,8 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         self._filter_names[FilterWheelPosition.UNKNOWN] = 'UNKNOWN'
 
         # allow to abort motion (filter wheel)
-        self._lock_motion = threading.Lock()
-        self._abort_motion = threading.Event()
+        self._lock_motion = asyncio.Lock()
+        self._abort_motion = asyncio.Event()
 
         # current position
         self._position = FilterWheelPosition.UNKNOWN
@@ -63,7 +63,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         if self.comm:
             await self.comm.register_event(FilterChangedEvent)
 
-    async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: threading.Event) -> Image:
+    async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: asyncio.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
