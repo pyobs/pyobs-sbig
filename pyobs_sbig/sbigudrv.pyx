@@ -1,5 +1,4 @@
 # distutils: language = c++
-import asyncio
 from enum import Enum
 from typing import Tuple
 import numpy as np
@@ -105,7 +104,6 @@ cdef class SBIGCam:
 
     def __init__(self):
         self.aborted = False
-        self.lock = asyncio.Lock()
 
     def establish_link(self):
         res = self.obj.EstablishLink()

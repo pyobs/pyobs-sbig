@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Optional
 
@@ -25,7 +26,10 @@ class SbigDriver(Object):
         # filter wheel
         self.filter_wheel = FilterWheelModel[filter_wheel]
 
-    def open(self) -> None:
+        # active lock
+        self._lock_active = asyncio.Lock()
+
+    async def open(self) -> None:
         """Open module.
 
         Raises:
@@ -47,17 +51,18 @@ class SbigDriver(Object):
         except ValueError as e:
             raise ValueError('Could not establish link: %s' % str(e))
 
-    def full_frame(self, sensor: ActiveSensor) -> Tuple[int, int, int, int]:
+    async def full_frame(self, sensor: ActiveSensor) -> Tuple[int, int, int, int]:
         """Return full frame."""
-        # TODO: maybe rethink this: should the camera return the full frame for the current binning and
-        # not for 1x1?
-        self.camera.binning = (1, 1)
-        self.camera.sensor = sensor
-        return self.camera.full_frame
+        async with self._lock_active:
+            # TODO: maybe rethink this: should the camera return the full frame for the current binning and
+            # not for 1x1?
+            self.camera.binning = (1, 1)
+            self.camera.sensor = sensor
+            return self.camera.full_frame
 
-    def start_exposure(self, sensor: ActiveSensor, img: SBIGImg, shutter: bool, exposure_time: float,
-                       window: Optional[Tuple[int, int, int, int]] = None,
-                       binning: Optional[Tuple[int, int]] = None) -> None:
+    async def start_exposure(self, sensor: ActiveSensor, img: SBIGImg, shutter: bool, exposure_time: float,
+                             window: Optional[Tuple[int, int, int, int]] = None,
+                             binning: Optional[Tuple[int, int]] = None) -> None:
         """Start an exposure.
 
         Args:
@@ -69,18 +74,20 @@ class SbigDriver(Object):
             binning: Binning to use.
         """
 
-        # set active sensor
-        self.camera.sensor = sensor
+        # do all settings within a mutex
+        async with self._lock_active:
+            # set active sensor
+            self.camera.sensor = sensor
 
-        # set exposure time, window and binnint
-        self.camera.exposure_time = exposure_time
-        self.camera.window = window
-        self.camera.binning = binning
+            # set exposure time, window and binnint
+            self.camera.exposure_time = exposure_time
+            self.camera.window = window
+            self.camera.binning = binning
 
-        # start exposure
-        self.camera.start_exposure(img, shutter)
+            # start exposure
+            self.camera.start_exposure(img, shutter)
 
-    def has_exposure_finished(self, sensor: ActiveSensor) -> bool:
+    async def has_exposure_finished(self, sensor: ActiveSensor) -> bool:
         """Whether an exposure has finished
 
         Args:
@@ -89,15 +96,17 @@ class SbigDriver(Object):
         Returns:
             Exposure finished or not.
         """
-        self.camera.sensor = sensor
-        return self.camera.has_exposure_finished()
+        async with self._lock_active:
+            self.camera.sensor = sensor
+            return self.camera.has_exposure_finished()
 
-    def end_exposure(self, sensor: ActiveSensor) -> None:
+    async def end_exposure(self, sensor: ActiveSensor) -> None:
         """End an exposure."""
-        self.camera.sensor = sensor
-        return self.camera.end_exposure()
+        async with self._lock_active:
+            self.camera.sensor = sensor
+            return self.camera.end_exposure()
 
-    def readout(self, sensor: ActiveSensor, img: SBIGImg, shutter: bool) -> None:
+    async def readout(self, sensor: ActiveSensor, img: SBIGImg, shutter: bool) -> None:
         """Readout image.
 
         Args:
@@ -105,8 +114,10 @@ class SbigDriver(Object):
             img: Image to read into.
             shutter: Whether shutter was open.
         """
-        self.camera.sensor = sensor
-        return self.camera.readout(img, shutter)
+        async with self._lock_active:
+            self.camera.sensor = sensor
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, self.camera.readout, img, shutter)
 
 
 __all__ = ['SbigDriver']

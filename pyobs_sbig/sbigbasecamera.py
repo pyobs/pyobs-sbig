@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 from datetime import datetime
@@ -70,7 +71,7 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         Returns:
             Tuple with left, top, width, and height set.
         """
-        return self._driver.full_frame(self._active_sensor)
+        return await self._driver.full_frame(self._active_sensor)
 
     async def get_window(self, **kwargs: Any) -> Tuple[int, int, int, int]:
         """Returns the camera window.
@@ -127,26 +128,25 @@ class SbigBaseCamera(BaseCamera, ICamera, IWindow):
         self._img.image_can_close = False
 
         # start exposure (can raise ValueError)
-        self._driver.start_exposure(self._active_sensor, self._img, open_shutter, exposure_time, window=window,
-                                    binning=binning)
+        await self._driver.start_exposure(self._active_sensor, self._img, open_shutter, exposure_time,
+                                          window=window, binning=binning)
 
         # wait for it
-        while not self._driver.has_exposure_finished(self._active_sensor):
+        while not await self._driver.has_exposure_finished(self._active_sensor):
             # was aborted?
             if abort_event.is_set():
                 raise ValueError('Exposure aborted.')
             await asyncio.sleep(0.01)
 
         # finish exposure
-        self._driver.end_exposure(self._active_sensor)
+        await self._driver.end_exposure(self._active_sensor)
 
         # wait for readout
         log.info('Exposure finished, reading out...')
         await self._change_exposure_status(ExposureStatus.READOUT)
 
         # start readout (can raise ValueError)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._driver.readout, self._active_sensor, self._img, open_shutter)
+        await self._driver.readout(self._active_sensor, self._img, open_shutter)
 
         # finalize image
         self._img.image_can_close = True
