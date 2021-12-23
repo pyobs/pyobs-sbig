@@ -201,7 +201,7 @@ cdef class SBIGCam:
         if res != 0:
             raise ValueError(self.obj.GetErrorString(res))
 
-    def get_cooling(self):
+    def get_cooling(self) -> Tuple[bool, float, float, float]:
         # define vars
         cdef MY_LOGICAL enabled = 0
         cdef double temp = 0.
@@ -214,14 +214,14 @@ cdef class SBIGCam:
             raise ValueError(self.obj.GetErrorString(res))
         return enabled == 1, temp, setpoint, power
 
-    def abort(self):
+    def abort(self) -> None:
         # abort exposure
         self.aborted = True
 
-    def was_aborted(self):
+    def was_aborted(self) -> bool:
         return self.aborted
 
-    def start_exposure(self, img: SBIGImg, shutter: bool):
+    def start_exposure(self, img: SBIGImg, shutter: bool) -> None:
          # define vars
         cdef MY_LOGICAL complete = 0
 
@@ -247,7 +247,7 @@ cdef class SBIGCam:
         if res != 0:
             raise ValueError('Could not start exposure: ' + self.obj.GetErrorString(res))
 
-    def has_exposure_finished(self):
+    def has_exposure_finished(self) -> bool:
          # define vars
         cdef MY_LOGICAL complete = 0
 
@@ -259,7 +259,7 @@ cdef class SBIGCam:
         # break on error or if complete or aborted
         return res != 0 or complete
 
-    def end_exposure(self):
+    def end_exposure(self) -> None:
         res = self.obj.EndExposure()
         if res != 0:
             raise ValueError('Could not end exposure: ' + self.obj.GetErrorString(res))
