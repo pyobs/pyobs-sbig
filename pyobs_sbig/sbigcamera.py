@@ -6,7 +6,7 @@ from typing import Any, Optional, Tuple, Dict
 import numpy as np
 
 from pyobs.images import Image
-from pyobs.interfaces import ICamera, IWindow
+from pyobs.interfaces import ICamera, IWindow, IBinning
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
 from pyobs_sbig.sbigudrv import SBIGImg, SBIGCam
@@ -15,7 +15,7 @@ from pyobs_sbig.sbigudrv import SBIGImg, SBIGCam
 log = logging.getLogger(__name__)
 
 
-class SbigCamera(BaseCamera, ICamera, IWindow):
+class SbigCamera(BaseCamera, ICamera, IWindow, IBinning):
     """A pyobs module for SBIG cameras."""
     __module__ = 'pyobs_sbig'
 
@@ -162,46 +162,47 @@ class SbigCamera(BaseCamera, ICamera, IWindow):
             ValueError: If exposure was not successful.
         """
 
+        #  binning
+        binning = self._binning
+
+        # set window, CSBIGCam expects left/top also in binned coordinates, so divide by binning
+        left = int(math.floor(self._window[0]) / binning[0])
+        top = int(math.floor(self._window[1]) / binning[1])
+        width = int(math.floor(self._window[2]) / binning[0])
+        height = int(math.floor(self._window[3]) / binning[1])
+        log.info("Set window to %dx%d (binned %dx%d) at %d,%d.",
+                 self._window[2], self._window[3], width, height, left, top)
+        window = (left, top, width, height)
+
+        # get date obs
+        log.info('Starting exposure with for %.2f seconds...', exposure_time)
+        date_obs = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
+
+        # init image
+        self._img.image_can_close = False
+
+        # start exposure (can raise ValueError)
+        await self.start_exposure(open_shutter, exposure_time, window=window, binning=binning)
+
+        # wait for it
+        while not await self.has_exposure_finished():
+            # was aborted?
+            if abort_event.is_set():
+                raise ValueError('Exposure aborted.')
+            await asyncio.sleep(0.01)
+
+        # finish exposure
+        await self.end_exposure()
+
+        # wait for readout
+        log.info('Exposure finished, reading out...')
+        await self._change_exposure_status(ExposureStatus.READOUT)
+
+        # start readout (can raise ValueError)
+        await self.readout(open_shutter)
+
+        # for direct access to driver, get lock
         async with self._lock_active:
-            #  binning
-            binning = self._binning
-
-            # set window, CSBIGCam expects left/top also in binned coordinates, so divide by binning
-            left = int(math.floor(self._window[0]) / binning[0])
-            top = int(math.floor(self._window[1]) / binning[1])
-            width = int(math.floor(self._window[2]) / binning[0])
-            height = int(math.floor(self._window[3]) / binning[1])
-            log.info("Set window to %dx%d (binned %dx%d) at %d,%d.",
-                     self._window[2], self._window[3], width, height, left, top)
-            window = (left, top, width, height)
-
-            # get date obs
-            log.info('Starting exposure with for %.2f seconds...', exposure_time)
-            date_obs = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
-
-            # init image
-            self._img.image_can_close = False
-
-            # start exposure (can raise ValueError)
-            await self.start_exposure(open_shutter, exposure_time, window=window, binning=binning)
-
-            # wait for it
-            while not await self.has_exposure_finished():
-                # was aborted?
-                if abort_event.is_set():
-                    raise ValueError('Exposure aborted.')
-                await asyncio.sleep(0.01)
-
-            # finish exposure
-            await self.end_exposure()
-
-            # wait for readout
-            log.info('Exposure finished, reading out...')
-            await self._change_exposure_status(ExposureStatus.READOUT)
-
-            # start readout (can raise ValueError)
-            await self.readout(open_shutter)
-
             # finalize image
             self._img.image_can_close = True
 
@@ -211,33 +212,33 @@ class SbigCamera(BaseCamera, ICamera, IWindow):
             # temp & cooling
             _, temp, setpoint, _ = self._cam.get_cooling()
 
-            # create FITS image and set header
-            img = Image(data)
-            img.header['DATE-OBS'] = (date_obs, 'Date and time of start of exposure')
-            img.header['EXPTIME'] = (exposure_time, 'Exposure time [s]')
-            img.header['DET-TEMP'] = (temp, 'CCD temperature [C]')
-            img.header['DET-TSET'] = (setpoint, 'Cooler setpoint [C]')
+        # create FITS image and set header
+        img = Image(data)
+        img.header['DATE-OBS'] = (date_obs, 'Date and time of start of exposure')
+        img.header['EXPTIME'] = (exposure_time, 'Exposure time [s]')
+        img.header['DET-TEMP'] = (temp, 'CCD temperature [C]')
+        img.header['DET-TSET'] = (setpoint, 'Cooler setpoint [C]')
 
-            # binning
-            img.header['XBINNING'] = img.header['DET-BIN1'] = (self._binning[0], 'Binning factor used on X axis')
-            img.header['YBINNING'] = img.header['DET-BIN2'] = (self._binning[1], 'Binning factor used on Y axis')
+        # binning
+        img.header['XBINNING'] = img.header['DET-BIN1'] = (self._binning[0], 'Binning factor used on X axis')
+        img.header['YBINNING'] = img.header['DET-BIN2'] = (self._binning[1], 'Binning factor used on Y axis')
 
-            # window
-            img.header['XORGSUBF'] = (self._window[0], 'Subframe origin on X axis')
-            img.header['YORGSUBF'] = (self._window[1], 'Subframe origin on Y axis')
+        # window
+        img.header['XORGSUBF'] = (self._window[0], 'Subframe origin on X axis')
+        img.header['YORGSUBF'] = (self._window[1], 'Subframe origin on Y axis')
 
-            # statistics
-            img.header['DATAMIN'] = (float(np.min(data)), 'Minimum data value')
-            img.header['DATAMAX'] = (float(np.max(data)), 'Maximum data value')
-            img.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
+        # statistics
+        img.header['DATAMIN'] = (float(np.min(data)), 'Minimum data value')
+        img.header['DATAMAX'] = (float(np.max(data)), 'Maximum data value')
+        img.header['DATAMEAN'] = (float(np.mean(data)), 'Mean data value')
 
-            # biassec/trimsec
-            frame = await self.get_full_frame()
-            self.set_biassec_trimsec(img.header, *frame)
+        # biassec/trimsec
+        frame = await self.get_full_frame()
+        self.set_biassec_trimsec(img.header, *frame)
 
-            # return FITS image
-            log.info('Readout finished.')
-            return img
+        # return FITS image
+        log.info('Readout finished.')
+        return img
 
     async def _abort_exposure(self) -> None:
         """Abort the running exposure. Should be implemented by derived class.
@@ -283,7 +284,8 @@ class SbigCamera(BaseCamera, ICamera, IWindow):
             log.info('Disabling cooling and setting setpoint to 20°C...')
 
         # do it
-        self._cam.set_cooling(enabled, setpoint)
+        async with self._lock_active:
+            self._cam.set_cooling(enabled, setpoint)
 
     async def get_cooling_status(self, **kwargs: Any) -> Tuple[bool, float, float]:
         """Returns the current status for the cooling.
@@ -296,7 +298,8 @@ class SbigCamera(BaseCamera, ICamera, IWindow):
         """
 
         try:
-            enabled, temp, setpoint, power = self._cam.get_cooling()
+            async with self._lock_active:
+                enabled, temp, setpoint, power = self._cam.get_cooling()
             self._cooling = enabled is True, setpoint, power * 100.
         except ValueError:
             # use existing cooling
@@ -311,7 +314,8 @@ class SbigCamera(BaseCamera, ICamera, IWindow):
         """
 
         try:
-            _, temp, _, _ = self._cam.get_cooling()
+            async with self._lock_active:
+                _, temp, _, _ = self._cam.get_cooling()
             return {'CCD': temp}
         except ValueError:
             # use existing temps
