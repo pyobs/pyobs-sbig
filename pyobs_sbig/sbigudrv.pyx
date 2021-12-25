@@ -315,7 +315,8 @@ cdef class SBIGCam:
         # acquire lock
         with acquire_lock(self.lock):
             # do readout
-            res = int(SBIGCam._readout(self.obj, img.obj, mode))
+            with nogil:
+                res = int(SBIGCam._readout(self.obj, img.obj, mode))
             if res != 0:
                 raise ValueError(self.obj.GetErrorString(int(res)))
 
