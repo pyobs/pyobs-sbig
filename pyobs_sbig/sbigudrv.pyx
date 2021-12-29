@@ -1,6 +1,5 @@
 # distutils: language = c++
 import threading
-import time
 from enum import Enum
 from contextlib import contextmanager
 from typing import Tuple
@@ -144,7 +143,7 @@ cdef class SBIGCam:
             self.obj.SetReadoutMode(rm)
 
     @property
-    def full_frame(self) -> Tuple[int, int]:
+    def full_frame(self) -> Tuple[int, int, int, int]:
         # define width and height
         cdef int width = 0
         cdef int height = 0
