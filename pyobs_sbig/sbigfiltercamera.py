@@ -18,7 +18,8 @@ log = logging.getLogger(__name__)
 
 class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
     """A pyobs module for SBIG cameras."""
-    __module__ = 'pyobs_sbig'
+
+    __module__ = "pyobs_sbig"
 
     def __init__(self, filter_wheel: str, filter_names: Optional[List[str]] = None, **kwargs: Any):
         """Initializes a new SbigCamera.
@@ -33,10 +34,10 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         # and filter names
         if filter_names is None:
-            filter_names = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+            filter_names = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
         positions = [p for p in FilterWheelPosition]
         self._filter_names = dict(zip(positions[1:], filter_names))
-        self._filter_names[FilterWheelPosition.UNKNOWN] = 'UNKNOWN'
+        self._filter_names[FilterWheelPosition.UNKNOWN] = "UNKNOWN"
 
         # allow to abort motion (filter wheel)
         self._lock_motion = asyncio.Lock()
@@ -46,7 +47,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         self._position = FilterWheelPosition.UNKNOWN
 
         # init mixins
-        MotionStatusMixin.__init__(self, **kwargs, motion_status_interfaces=['IFilters'])
+        MotionStatusMixin.__init__(self, **kwargs, motion_status_interfaces=["IFilters"])
 
     async def open(self) -> None:
         """Open module.
@@ -57,18 +58,18 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         # set filter wheel model
         if self.filter_wheel != FilterWheelModel.UNKNOWN:
-            log.info('Initialising filter wheel...')
+            log.info("Initialising filter wheel...")
             try:
                 self._cam.set_filter_wheel(self.filter_wheel)
             except ValueError as e:
-                raise ValueError('Could not set filter wheel: %s' % str(e))
+                raise ValueError("Could not set filter wheel: %s" % str(e))
 
         # open camera
         await SbigCamera.open(self)
 
         # init status of filter wheel
         if self.filter_wheel != FilterWheelModel.UNKNOWN:
-            await self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
+            await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
 
         # subscribe to events
         if self.comm:
@@ -94,7 +95,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         # add filter to FITS headers
         if self.filter_wheel != FilterWheelModel.UNKNOWN:
-            img.header['FILTER'] = (await self.get_filter(), 'Current filter')
+            img.header["FILTER"] = (await self.get_filter(), "Current filter")
 
         # finished
         return img
@@ -117,21 +118,21 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # reverse dict and search for name
         filters = {y: x for x, y in self._filter_names.items()}
         if filter_name not in filters:
-            raise ValueError('Unknown filter: %s' % filter_name)
+            raise ValueError("Unknown filter: %s" % filter_name)
 
         # there already?
         position, status = self._cam.get_filter_position_and_status()
         if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
-            log.info('Filter changed.')
+            log.info("Filter changed.")
             return
 
         # set status
-        await self._change_motion_status(MotionStatus.SLEWING, interface='IFilters')
+        await self._change_motion_status(MotionStatus.SLEWING, interface="IFilters")
 
         # acquire lock
         async with LockWithAbort(self._lock_motion, self._abort_motion):
             # set it
-            log.info('Changing filter to %s...', filter_name)
+            log.info("Changing filter to %s...", filter_name)
             self._cam.set_filter(filters[filter_name])
 
             # wait for it
@@ -143,15 +144,15 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
                 # abort?
                 if self._abort_motion.is_set():
-                    log.warning('Filter change aborted.')
+                    log.warning("Filter change aborted.")
                     return
 
             # send event
-            log.info('Filter changed.')
+            log.info("Filter changed.")
             self.comm.send_event(FilterChangedEvent(filter_name))
 
         # set status
-        await self._change_motion_status(MotionStatus.POSITIONED, interface='IFilters')
+        await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
 
     async def get_filter(self, **kwargs: Any) -> str:
         """Get currently set filter.
@@ -205,4 +206,4 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         return True
 
 
-__all__ = ['SbigFilterCamera']
+__all__ = ["SbigFilterCamera"]
