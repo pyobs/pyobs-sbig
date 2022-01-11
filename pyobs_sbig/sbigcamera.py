@@ -9,6 +9,8 @@ from pyobs.images import Image
 from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
+from pyobs.utils import exceptions as exc
+
 from .sbigudrv import SBIGImg, SBIGCam
 
 
@@ -111,7 +113,8 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
             The actual image.
 
         Raises:
-            ValueError: If exposure was not successful.
+            GrabImageError: If exposure was not successful.
+            AbortedError: If exposure was aborted.
         """
 
         async with self._lock_active:
@@ -153,7 +156,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
             while not self._cam.has_exposure_finished():
                 # was aborted?
                 if abort_event.is_set():
-                    raise ValueError("Exposure aborted.")
+                    raise exc.AbortedError("Exposure aborted.")
                 await asyncio.sleep(0.01)
 
             # finish exposure

@@ -26,7 +26,8 @@ class Sbig6303eCamera(SbigFilterCamera):
             The actual image.
 
         Raises:
-            ValueError: If exposure was not successful.
+            GrabImageError: If exposure was not successful.
+            AbortedError: If exposure was aborted.
         """
 
         # do expsure
