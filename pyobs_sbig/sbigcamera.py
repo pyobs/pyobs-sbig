@@ -156,7 +156,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
             while not self._cam.has_exposure_finished():
                 # was aborted?
                 if abort_event.is_set():
-                    raise exc.AbortedError("Exposure aborted.")
+                    raise InterruptedError("Exposure aborted.")
                 await asyncio.sleep(0.01)
 
             # finish exposure
