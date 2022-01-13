@@ -114,7 +114,6 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
 
         Raises:
             GrabImageError: If exposure was not successful.
-            AbortedError: If exposure was aborted.
         """
 
         async with self._lock_active:

@@ -88,7 +88,6 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         Raises:
             GrabImageError: If exposure was not successful.
-            AbortedError: If exposure was aborted.
         """
 
         # do expsure
@@ -145,8 +144,10 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
                 # abort?
                 if self._abort_motion.is_set():
-                    log.warning("Filter change aborted.")
-                    return
+                    raise InterruptedError("Filter change aborted.")
+
+                # sleep a little
+                await asyncio.sleep(0.1)
 
             # send event
             log.info("Filter changed.")
