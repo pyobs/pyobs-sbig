@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyobs-sbig"
-version = "0.15.0"
+version = "0.16.0"
 description = "pyobs module for SBIG cameras"
 authors = ["Tim-Oliver Husser <thusser@uni-goettingen.de>"]
 license = "MIT"
@@ -17,7 +17,13 @@ numpy = "^1.21"
 astropy = "^5.0"
 
 [tool.poetry.dev-dependencies]
+black = "^21.12b0"
+pre-commit = "^2.16.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "Cython>=0.29.0", "numpy>=1.21.0", "setuptools"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ['py39']

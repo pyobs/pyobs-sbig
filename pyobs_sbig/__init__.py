@@ -1,7 +1,7 @@
 """
 TODO: write doc
 """
-__title__ = 'SBIG camera modules'
+__title__ = "SBIG camera modules"
 
 from .sbigcamera import SbigCamera
 from .sbigfiltercamera import SbigFilterCamera
