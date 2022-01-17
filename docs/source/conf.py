@@ -47,6 +47,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosectionlabel",
+    "sphinx.ext.intersphinx",
     #'sphinx_autodoc_typehints'
 ]
 
@@ -95,6 +96,10 @@ pygments_style = "sphinx"
 nitpicky = True
 nitpick_ignore = []
 
+# intersphinx
+intersphinx_mapping = {
+    "pyobs": ("https://pyobs-core.readthedocs.io/en/latest/", None),
+}
 
 # -- Options for HTML output -------------------------------------------------
 
