@@ -87,7 +87,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             The actual image.
 
         Raises:
-            GrabImageError: If exposure was not successful.
+            pyobs.utils.exceptions.GrabImageError: If exposure was not successful.
         """
 
         # do expsure
@@ -196,15 +196,35 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         return [f for f in self._filter_names.values() if f is not None]
 
     async def init(self, **kwargs: Any) -> None:
+        """Initialize device.
+
+        Raises:
+            pyobs.utils.exceptions.InitError: If device could not be initialized.
+        """
         pass
 
     async def park(self, **kwargs: Any) -> None:
+        """Park device.
+
+        Raises:
+            pyobs.utils.exceptions.ParkError: If device could not be parked.
+        """
         pass
 
     async def stop_motion(self, device: Optional[str] = None, **kwargs: Any) -> None:
+        """Stop the motion.
+
+        Args:
+            device: Name of device to stop, or None for all.
+        """
         pass
 
     async def is_ready(self, **kwargs: Any) -> bool:
+        """Returns the device is "ready", whatever that means for the specific device.
+
+        Returns:
+            Whether device is ready
+        """
         return True
 
 

@@ -111,7 +111,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
             The actual image.
 
         Raises:
-            GrabImageError: If exposure was not successful.
+            pyobs.utils.exceptions.GrabImageError: If exposure was not successful.
         """
 
         async with self._lock_active:
