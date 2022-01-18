@@ -9,7 +9,6 @@ from pyobs.images import Image
 from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
-from pyobs.utils import exceptions as exc
 
 from .sbigudrv import SBIGImg, SBIGCam
 
@@ -26,8 +25,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
         """Initializes a new SbigCamera.
 
         Args:
-            sensor: Sensor to use, if camera has more than one.
-            driver_kwargs: kwargs for driver.
+            setpoint: Temperature setpoint.
 
         """
         BaseCamera.__init__(self, **kwargs)
@@ -113,7 +111,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
             The actual image.
 
         Raises:
-            GrabImageError: If exposure was not successful.
+            pyobs.utils.exceptions.GrabImageError: If exposure was not successful.
         """
 
         async with self._lock_active:
