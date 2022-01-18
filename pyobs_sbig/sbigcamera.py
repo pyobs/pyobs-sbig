@@ -10,8 +10,6 @@ from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
 
-from .sbigudrv import SBIGImg, SBIGCam
-
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +27,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
 
         """
         BaseCamera.__init__(self, **kwargs)
+        from .sbigudrv import SBIGImg, SBIGCam
 
         # create image and cam
         self._img = SBIGImg()
