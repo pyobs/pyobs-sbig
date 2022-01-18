@@ -27,7 +27,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
 
         """
         BaseCamera.__init__(self, **kwargs)
-        from .sbigudrv import SBIGImg, SBIGCam
+        from .sbigudrv import SBIGImg, SBIGCam  # type: ignore
 
         # create image and cam
         self._img = SBIGImg()
