@@ -8,9 +8,7 @@ from pyobs.events import FilterChangedEvent
 from pyobs.interfaces import IFilters
 from pyobs.utils.enums import MotionStatus
 from pyobs.utils.threads import LockWithAbort
-
 from .sbigcamera import SbigCamera
-from .sbigudrv import FilterWheelPosition, FilterWheelStatus, FilterWheelModel
 
 
 log = logging.getLogger(__name__)
@@ -28,6 +26,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             filter_names: List of filter names.
         """
         SbigCamera.__init__(self, **kwargs)
+        from .sbigudrv import FilterWheelPosition, FilterWheelModel  # type: ignore
 
         # filter wheel
         self.filter_wheel = FilterWheelModel[filter_wheel]
@@ -55,6 +54,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         Raises:
             ValueError: If cannot connect to camera or set filter wheel.
         """
+        from .sbigudrv import FilterWheelModel
 
         # set filter wheel model
         if self.filter_wheel != FilterWheelModel.UNKNOWN:
@@ -89,6 +89,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         Raises:
             pyobs.utils.exceptions.GrabImageError: If exposure was not successful.
         """
+        from .sbigudrv import FilterWheelModel
 
         # do expsure
         img = await SbigCamera._expose(self, exposure_time, open_shutter, abort_event)
@@ -110,6 +111,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             ValueError: If binning could not be set.
             NotImplementedError: If camera doesn't have a filter wheel.
         """
+        from .sbigudrv import FilterWheelModel, FilterWheelStatus
 
         # do we have a filter wheel?
         if self.filter_wheel == FilterWheelModel.UNKNOWN:
@@ -166,6 +168,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             ValueError: If filter could not be fetched.
             NotImplementedError: If camera doesn't have a filter wheel.
         """
+        from .sbigudrv import FilterWheelModel
 
         # do we have a filter wheel?
         if self.filter_wheel == FilterWheelModel.UNKNOWN:
@@ -187,6 +190,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         Raises:
             NotImplementedError: If camera doesn't have a filter wheel.
         """
+        from .sbigudrv import FilterWheelModel
 
         # do we have a filter wheel?
         if self.filter_wheel == FilterWheelModel.UNKNOWN:
