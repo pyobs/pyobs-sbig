@@ -279,7 +279,7 @@ cdef class SBIGCam:
             shutter_cmd = SHUTTER_COMMAND.SC_OPEN_SHUTTER if shutter else  SHUTTER_COMMAND.SC_CLOSE_SHUTTER
             res = self.obj.StartExposure(shutter_cmd)
             if res != 0:
-                raise ValueError('Could not start exposure: ' + self.obj.GetErrorString(res))
+                raise ValueError('Could not start exposure: ' + str(self.obj.GetErrorString(res)))
 
     def has_exposure_finished(self):
          # define vars
@@ -300,7 +300,7 @@ cdef class SBIGCam:
         with acquire_lock(self.lock):
             res = self.obj.EndExposure()
             if res != 0:
-                raise ValueError('Could not end exposure: ' + self.obj.GetErrorString(res))
+                raise ValueError('Could not end exposure: ' + str(self.obj.GetErrorString(res)))
 
     @staticmethod
     cdef int _readout(CSBIGCam *cam, CSBIGImg *img, SBIG_DARK_FRAME mode) nogil:
