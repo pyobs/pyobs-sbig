@@ -6,7 +6,7 @@ from typing import Any, Tuple, Dict
 import numpy as np
 
 from pyobs.images import Image
-from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures
+from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures, IAbortable
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
 
@@ -14,7 +14,7 @@ from pyobs.utils.enums import ExposureStatus
 log = logging.getLogger(__name__)
 
 
-class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures):
+class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures, IAbortable):
     """A pyobs module for SBIG cameras."""
 
     __module__ = "pyobs_sbig"
