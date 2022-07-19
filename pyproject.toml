@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyobs-sbig"
-version = "0.18.0"
+version = "0.20.0"
 description = "pyobs module for SBIG cameras"
 authors = ["Tim-Oliver Husser <thusser@uni-goettingen.de>"]
 license = "MIT"
@@ -15,7 +15,7 @@ generate-setup-file = false
 python = ">=3.9,<3.11"
 numpy = "^1.21"
 astropy = "^5.0"
-pyobs-core = "^0.16.1"
+pyobs-core = ">0.18"
 
 [tool.poetry.dev-dependencies]
 black = "^21.12b0"
