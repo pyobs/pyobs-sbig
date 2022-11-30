@@ -6,7 +6,7 @@ from typing import Any, Tuple, Dict
 import numpy as np
 
 from pyobs.images import Image
-from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures, IAbortable
+from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures, IAbortable, ICooling
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
 
@@ -14,7 +14,7 @@ from pyobs.utils.enums import ExposureStatus
 log = logging.getLogger(__name__)
 
 
-class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures, IAbortable):
+class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures, IAbortable):
     """A pyobs module for SBIG cameras."""
 
     __module__ = "pyobs_sbig"
@@ -248,6 +248,20 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ITemperatures, IAbortab
         # do it
         async with self._lock_active:
             self._cam.set_cooling(enabled, setpoint)
+
+    async def get_cooling(self, **kwargs: Any) -> Tuple[bool, float, float]:
+        """Returns the current status for the cooling.
+
+        Returns:
+            (tuple): Tuple containing:
+                Enabled:  Whether the cooling is enabled
+                SetPoint: Setpoint for the cooling in celsius.
+                Power:    Current cooling power in percent or None.
+        """
+
+        async with self._lock_active:
+            enabled, _, setpoint, power = self._cam.get_cooling()
+            return enabled, setpoint, power
 
     async def get_cooling_status(self, **kwargs: Any) -> Tuple[bool, float, float]:
         """Returns the current status for the cooling.
