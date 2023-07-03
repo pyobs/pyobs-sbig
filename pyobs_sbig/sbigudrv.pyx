@@ -13,7 +13,7 @@ from .sbigudrv cimport *
 
 @contextmanager
 def acquire_lock(lock):
-    if not lock.acquire(timeout=1):
+    if not lock.acquire(timeout=5):
         raise ValueError('Could not acquire exclusive lock on camera.')
     yield
     lock.release()
