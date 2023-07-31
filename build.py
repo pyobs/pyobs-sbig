@@ -1,4 +1,6 @@
 import os
+import shutil
+
 from setuptools import Extension, Distribution
 import numpy
 from Cython.Build import cythonize
@@ -36,8 +38,12 @@ def build() -> None:
     # distribution.package_dir = "extended"
 
     distribution.run_command("build_ext")
+
+    # copy to source
     build_ext_cmd = distribution.get_command_obj("build_ext")
-    build_ext_cmd.copy_extensions_to_source()
+    for ext in build_ext_cmd.extensions:
+        filename = build_ext_cmd.get_ext_filename(ext.name)
+        shutil.copyfile(os.path.join(build_ext_cmd.build_lib, filename), filename)
 
 
 if __name__ == "__main__":

@@ -13,16 +13,16 @@ generate-setup-file = false
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
-numpy = "^1.21"
-astropy = "^5.0"
-pyobs-core = "^1.0"
+numpy = "^1.25.1"
+astropy = "^5.3.1"
+pyobs-core = "^1.4.5"
 
 [tool.poetry.dev-dependencies]
-black = "^21.12b0"
-pre-commit = "^2.16"
+black = "^23.7.0"
+pre-commit = "^3.3.3"
 sphinx-rtd-theme = "^1.0"
 Sphinx = "^4.4"
-Cython = "^0.29"
+Cython = "^3.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "Cython>=0.29.0", "numpy>=1.21.0", "setuptools"]
