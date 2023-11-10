@@ -2,7 +2,7 @@ import asyncio
 import logging
 import math
 from datetime import datetime
-from typing import Any, Tuple, Dict
+from typing import Any, Tuple, Dict, List
 import numpy as np
 
 from pyobs.images import Image
@@ -209,6 +209,9 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             ValueError: If an error occured.
         """
         await self._change_exposure_status(ExposureStatus.IDLE)
+
+    async def list_binnings(self, **kwargs: Any) -> List[Tuple[int, int]]:
+        return [(1, 1), (2, 2), (3, 3)]
 
     async def get_binning(self, **kwargs: Any) -> Tuple[int, int]:
         """Returns the camera binning.
