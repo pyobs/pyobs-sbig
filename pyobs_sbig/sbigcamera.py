@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Tuple, Dict, List
 import numpy as np
 
@@ -135,7 +135,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
             # get date obs
             log.info("Starting exposure with for %.2f seconds...", exposure_time)
-            date_obs = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
+            date_obs = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
             # init image
             self._img.image_can_close = False
