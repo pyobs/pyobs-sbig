@@ -20,15 +20,20 @@ dev = [
 ]
 
 [tool.hatch.build.targets.sdist]
-include = ["src"]
+include = ["pyobs_sbig", "build.py"]
 
 [tool.hatch.build.targets.wheel]
-include = ["src"]
+include = ["pyobs_sbig", "build.py"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-build-scripts"]
 build-backend = "hatchling.build"
 
 [tool.black]
 line-length = 120
 target-version = ['py311']
+
+[[tool.hatch.build.hooks.build-scripts.scripts]]
+out_dir = "pyobs_sbig"
+commands = ["python build.py"]
+#artifacts = ["sbigudrv.cpython-311-x86_64-linux-gnu.so"]

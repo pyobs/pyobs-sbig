@@ -1,6 +1,9 @@
+# flake8: noqa
 import os
 import shutil
+import sys
 
+sys.path.insert(0, ".venv/lib/python3.11/site-packages/")
 from setuptools import Extension, Distribution
 import numpy
 from Cython.Build import cythonize
