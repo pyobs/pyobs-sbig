@@ -11,7 +11,7 @@ dependencies = [
     "pyobs-core>=1,<2",
 ]
 
-[poetry.group.dev.dependencies]
+[tool.poetry.group.dev.dependencies]
 black = ">=25.1.0,<26"
 pre-commit = ">=4.2.0,<5"
 flake8 = ">=7.3.0"
