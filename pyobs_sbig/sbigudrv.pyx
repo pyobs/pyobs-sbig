@@ -5,8 +5,8 @@ from contextlib import contextmanager
 from typing import Tuple
 
 import numpy as np
-cimport numpy as np
-np.import_array()
+cimport numpy as npc
+npc.import_array()
 
 from .sbigudrv cimport *
 
@@ -86,8 +86,8 @@ cdef class SBIGImg:
         width, height = self.obj.GetWidth(), self.obj.GetHeight()
 
         # create a C array to describe the shape of the ndarray
-        cdef np.npy_intp shape[1]
-        shape[0] = <np.npy_intp>(width * height)
+        cdef npc.npy_intp shape[1]
+        shape[0] = <npc.npy_intp>(width * height)
 
         # Use the PyArray_SimpleNewFromData function from numpy to create a
         # new Python object pointing to the existing data
