@@ -2,7 +2,7 @@ from libcpp.string cimport string
 from enum import Enum
 
 
-cdef extern from "../src/csbigimg.h":
+cdef extern from "csbigimg.h":
     ctypedef unsigned short MY_LOGICAL
 
     cdef cppclass CSBIGImg:
@@ -110,7 +110,7 @@ cdef extern from "../src/csbigimg.h":
         void			RemoveBayerColor()
 
 
-cdef extern from "../src/csbigcam.h":
+cdef extern from "csbigcam.h":
     cdef enum SBIG_DEVICE_TYPE:
         DEV_USB = 0x7F00
 
