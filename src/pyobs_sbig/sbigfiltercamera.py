@@ -72,7 +72,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         # subscribe to events
         if self._comm:
-            await self._comm.register_event(FilterChangedEvent)
+            await self.comm.register_event(FilterChangedEvent)
 
     async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: asyncio.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
@@ -152,7 +152,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
             # send event
             log.info("Filter changed.")
-            self._comm.send_event(FilterChangedEvent(filter_name))
+            self.comm.send_event(FilterChangedEvent(filter_name))
 
         # set status
         await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
