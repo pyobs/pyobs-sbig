@@ -29,13 +29,11 @@ class Sbig6303eCamera(SbigFilterCamera):
             GrabImageError: If exposure was not successful.
         """
 
-        # do expsure
+        # do exposure
         img = await SbigFilterCamera._expose(self, exposure_time, open_shutter, abort_event)
 
-        # get binning
-        xbin, ybin = await self.get_binning()
-
         # gain is different in binned images
+        xbin, ybin = self._binning
         gain = (1.4, "Detector gain [e-/ADU]") if xbin == ybin == 1 else (2.3, "Detector gain [e-/ADU]")
         img.header["DET-GAIN"] = gain
 
@@ -50,9 +48,6 @@ class Sbig6303eCamera(SbigFilterCamera):
 
     async def stop_motion(self, device: str | None = None, **kwargs: Any) -> None:
         pass
-
-    async def is_ready(self, **kwargs: Any) -> bool:
-        return True
 
 
 __all__ = ["Sbig6303eCamera"]
