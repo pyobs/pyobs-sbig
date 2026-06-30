@@ -1,15 +1,14 @@
 import asyncio
 import logging
 import math
-from datetime import datetime, timezone
-from typing import Any, Tuple, Dict, List
-import numpy as np
+from datetime import UTC, datetime
+from typing import Any
 
+import numpy as np
 from pyobs.images import Image
-from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures, IAbortable, ICooling
+from pyobs.interfaces import IAbortable, IBinning, ICamera, ICooling, ITemperatures, IWindow
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
-
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
         """
         BaseCamera.__init__(self, **kwargs)
-        from .sbigudrv import SBIGImg, SBIGCam  # type: ignore
+        from .sbigudrv import SBIGCam, SBIGImg  # type: ignore
 
         # create image and cam
         self._img = SBIGImg()
@@ -58,7 +57,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         try:
             self._cam.establish_link()
         except ValueError as e:
-            raise ValueError("Could not establish link: %s" % str(e))
+            raise ValueError(f"Could not establish link: {e}")
 
         # cooling
         await self.set_cooling(self._setpoint is not None, self._setpoint)
@@ -70,7 +69,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         # get window
         self._window = self._full_frame
 
-    async def get_full_frame(self, **kwargs: Any) -> Tuple[int, int, int, int]:
+    async def get_full_frame(self, **kwargs: Any) -> tuple[int, int, int, int]:
         """Returns full size of CCD.
 
         Returns:
@@ -78,7 +77,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """
         return self._full_frame
 
-    async def get_window(self, **kwargs: Any) -> Tuple[int, int, int, int]:
+    async def get_window(self, **kwargs: Any) -> tuple[int, int, int, int]:
         """Returns the camera window.
 
         Returns:
@@ -135,7 +134,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
             # get date obs
             log.info("Starting exposure with for %.2f seconds...", exposure_time)
-            date_obs = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
+            date_obs = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
             # init image
             self._img.image_can_close = False
@@ -210,10 +209,10 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """
         await self._change_exposure_status(ExposureStatus.IDLE)
 
-    async def list_binnings(self, **kwargs: Any) -> List[Tuple[int, int]]:
+    async def list_binnings(self, **kwargs: Any) -> list[tuple[int, int]]:
         return [(1, 1), (2, 2), (3, 3)]
 
-    async def get_binning(self, **kwargs: Any) -> Tuple[int, int]:
+    async def get_binning(self, **kwargs: Any) -> tuple[int, int]:
         """Returns the camera binning.
 
         Returns:
@@ -252,7 +251,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         async with self._lock_active:
             self._cam.set_cooling(enabled, setpoint)
 
-    async def get_cooling(self, **kwargs: Any) -> Tuple[bool, float, float]:
+    async def get_cooling(self, **kwargs: Any) -> tuple[bool, float, float]:
         """Returns the current status for the cooling.
 
         Returns:
@@ -266,7 +265,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             enabled, _, setpoint, power = self._cam.get_cooling()
             return enabled, setpoint, power
 
-    async def get_cooling_status(self, **kwargs: Any) -> Tuple[bool, float, float]:
+    async def get_cooling_status(self, **kwargs: Any) -> tuple[bool, float, float]:
         """Returns the current status for the cooling.
 
         Returns:
@@ -285,7 +284,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             pass
         return self._cooling
 
-    async def get_temperatures(self, **kwargs: Any) -> Dict[str, float]:
+    async def get_temperatures(self, **kwargs: Any) -> dict[str, float]:
         """Returns all temperatures measured by this module.
 
         Returns:

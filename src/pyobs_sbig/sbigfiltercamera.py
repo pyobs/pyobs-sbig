@@ -1,13 +1,14 @@
 import asyncio
 import logging
-from typing import List, Optional, Any
+from typing import Any
 
-from pyobs.images import Image
-from pyobs.mixins import MotionStatusMixin
 from pyobs.events import FilterChangedEvent
+from pyobs.images import Image
 from pyobs.interfaces import IFilters
+from pyobs.mixins import MotionStatusMixin
 from pyobs.utils.enums import MotionStatus
 from pyobs.utils.threads import LockWithAbort
+
 from .sbigcamera import SbigCamera
 
 log = logging.getLogger(__name__)
@@ -18,14 +19,14 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
     __module__ = "pyobs_sbig"
 
-    def __init__(self, filter_wheel: str, filter_names: Optional[List[str]] = None, **kwargs: Any):
+    def __init__(self, filter_wheel: str, filter_names: list[str] | None = None, **kwargs: Any):
         """Initializes a new SbigCamera.
 
         Args:
             filter_names: List of filter names.
         """
         SbigCamera.__init__(self, **kwargs)
-        from .sbigudrv import FilterWheelPosition, FilterWheelModel  # type: ignore
+        from .sbigudrv import FilterWheelModel, FilterWheelPosition  # type: ignore
 
         # filter wheel
         self.filter_wheel = FilterWheelModel[filter_wheel]
@@ -61,7 +62,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             try:
                 self._cam.set_filter_wheel(self.filter_wheel)
             except ValueError as e:
-                raise ValueError("Could not set filter wheel: %s" % str(e))
+                raise ValueError(f"Could not set filter wheel: {e}")
 
         # open camera
         await SbigCamera.open(self)
@@ -119,7 +120,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # reverse dict and search for name
         filters = {y: x for x, y in self._filter_names.items()}
         if filter_name not in filters:
-            raise ValueError("Unknown filter: %s" % filter_name)
+            raise ValueError(f"Unknown filter: {filter_name}")
 
         # there already?
         position, status = self._cam.get_filter_position_and_status()
@@ -152,7 +153,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
             # send event
             log.info("Filter changed.")
-            self.comm.send_event(FilterChangedEvent(filter_name))
+            await self.comm.send_event(FilterChangedEvent(filter_name))
 
         # set status
         await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
@@ -180,7 +181,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             pass
         return self._filter_names[self._position]
 
-    async def list_filters(self, **kwargs: Any) -> List[str]:
+    async def list_filters(self, **kwargs: Any) -> list[str]:
         """List available filters.
 
         Returns:
@@ -214,7 +215,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
         pass
 
-    async def stop_motion(self, device: Optional[str] = None, **kwargs: Any) -> None:
+    async def stop_motion(self, device: str | None = None, **kwargs: Any) -> None:
         """Stop the motion.
 
         Args:

@@ -1,10 +1,10 @@
 import asyncio
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from pyobs.images import Image
-from .sbigfiltercamera import SbigFilterCamera
 
+from .sbigfiltercamera import SbigFilterCamera
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class Sbig6303eCamera(SbigFilterCamera):
     async def park(self, **kwargs: Any) -> None:
         pass
 
-    async def stop_motion(self, device: Optional[str] = None, **kwargs: Any) -> None:
+    async def stop_motion(self, device: str | None = None, **kwargs: Any) -> None:
         pass
 
     async def is_ready(self, **kwargs: Any) -> bool:
