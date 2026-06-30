@@ -1,15 +1,17 @@
 import asyncio
 import logging
-from typing import List, Optional, Any
+from typing import Any
 
-from pyobs.images import Image
-from pyobs.mixins import MotionStatusMixin
 from pyobs.events import FilterChangedEvent
-from pyobs.interfaces import IFilters
+from pyobs.images import Image
+from pyobs.interfaces import IFilters, IReady
+from pyobs.interfaces.IFilters import FiltersCapabilities, FilterState
+from pyobs.interfaces.IReady import ReadyState
+from pyobs.mixins import MotionStatusMixin
 from pyobs.utils.enums import MotionStatus
 from pyobs.utils.threads import LockWithAbort
-from .sbigcamera import SbigCamera
 
+from .sbigcamera import SbigCamera
 
 log = logging.getLogger(__name__)
 
@@ -19,14 +21,14 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
     __module__ = "pyobs_sbig"
 
-    def __init__(self, filter_wheel: str, filter_names: Optional[List[str]] = None, **kwargs: Any):
+    def __init__(self, filter_wheel: str, filter_names: list[str] | None = None, **kwargs: Any):
         """Initializes a new SbigCamera.
 
         Args:
             filter_names: List of filter names.
         """
         SbigCamera.__init__(self, **kwargs)
-        from .sbigudrv import FilterWheelPosition, FilterWheelModel  # type: ignore
+        from .sbigudrv import FilterWheelModel, FilterWheelPosition  # type: ignore
 
         # filter wheel
         self.filter_wheel = FilterWheelModel[filter_wheel]
@@ -62,18 +64,35 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             try:
                 self._cam.set_filter_wheel(self.filter_wheel)
             except ValueError as e:
-                raise ValueError("Could not set filter wheel: %s" % str(e))
+                raise ValueError(f"Could not set filter wheel: {e}")
 
-        # open camera
+        # open camera (connects to hardware, publishes IWindow/IBinning states)
         await SbigCamera.open(self)
 
-        # init status of filter wheel
-        if self.filter_wheel != FilterWheelModel.UNKNOWN:
-            await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
+        # init mixin — registers events and publishes initial IMotion state
+        await MotionStatusMixin.open(self)
 
         # subscribe to events
-        if self.comm:
+        if self._comm:
             await self.comm.register_event(FilterChangedEvent)
+
+        if self.filter_wheel != FilterWheelModel.UNKNOWN:
+            # set motion status to positioned
+            await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
+
+            # publish filter capabilities
+            filter_list = [name for name in self._filter_names.values() if name != "UNKNOWN"]
+            await self.comm.set_capabilities(IFilters, FiltersCapabilities(filters=filter_list))
+
+            # query and publish current filter position
+            try:
+                self._position, _ = self._cam.get_filter_position_and_status()
+            except (ValueError, Exception):
+                pass
+            await self.comm.set_state(IFilters, FilterState(filter=self._filter_names[self._position]))
+
+        # camera is ready once open
+        await self.comm.set_state(IReady, ReadyState(ready=True))
 
     async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: asyncio.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
@@ -91,12 +110,12 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
         from .sbigudrv import FilterWheelModel
 
-        # do expsure
+        # do exposure
         img = await SbigCamera._expose(self, exposure_time, open_shutter, abort_event)
 
         # add filter to FITS headers
         if self.filter_wheel != FilterWheelModel.UNKNOWN:
-            img.header["FILTER"] = (await self.get_filter(), "Current filter")
+            img.header["FILTER"] = (self._filter_names[self._position], "Current filter")
 
         # finished
         return img
@@ -120,7 +139,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # reverse dict and search for name
         filters = {y: x for x, y in self._filter_names.items()}
         if filter_name not in filters:
-            raise ValueError("Unknown filter: %s" % filter_name)
+            raise ValueError(f"Unknown filter: {filter_name}")
 
         # there already?
         position, status = self._cam.get_filter_position_and_status()
@@ -151,53 +170,14 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
                 # sleep a little
                 await asyncio.sleep(0.1)
 
-            # send event
+            # update cached position and publish new state
+            self._position = filters[filter_name]
             log.info("Filter changed.")
-            self.comm.send_event(FilterChangedEvent(filter_name))
+            await self.comm.send_event(FilterChangedEvent(filter_name))
+            await self.comm.set_state(IFilters, FilterState(filter=filter_name))
 
         # set status
         await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
-
-    async def get_filter(self, **kwargs: Any) -> str:
-        """Get currently set filter.
-
-        Returns:
-            Name of currently set filter.
-
-        Raises:
-            ValueError: If filter could not be fetched.
-            NotImplementedError: If camera doesn't have a filter wheel.
-        """
-        from .sbigudrv import FilterWheelModel
-
-        # do we have a filter wheel?
-        if self.filter_wheel == FilterWheelModel.UNKNOWN:
-            raise NotImplementedError
-
-        try:
-            self._position, _ = self._cam.get_filter_position_and_status()
-        except ValueError:
-            # use existing position
-            pass
-        return self._filter_names[self._position]
-
-    async def list_filters(self, **kwargs: Any) -> List[str]:
-        """List available filters.
-
-        Returns:
-            List of available filters.
-
-        Raises:
-            NotImplementedError: If camera doesn't have a filter wheel.
-        """
-        from .sbigudrv import FilterWheelModel
-
-        # do we have a filter wheel?
-        if self.filter_wheel == FilterWheelModel.UNKNOWN:
-            raise NotImplementedError
-
-        # return names
-        return [f for f in self._filter_names.values() if f is not None]
 
     async def init(self, **kwargs: Any) -> None:
         """Initialize device.
@@ -215,21 +195,13 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """
         pass
 
-    async def stop_motion(self, device: Optional[str] = None, **kwargs: Any) -> None:
+    async def stop_motion(self, device: str | None = None, **kwargs: Any) -> None:
         """Stop the motion.
 
         Args:
             device: Name of device to stop, or None for all.
         """
         pass
-
-    async def is_ready(self, **kwargs: Any) -> bool:
-        """Returns the device is "ready", whatever that means for the specific device.
-
-        Returns:
-            Whether device is ready
-        """
-        return True
 
 
 __all__ = ["SbigFilterCamera"]

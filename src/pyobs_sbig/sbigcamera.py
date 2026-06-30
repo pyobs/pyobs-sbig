@@ -1,15 +1,18 @@
 import asyncio
 import logging
 import math
-from datetime import datetime, timezone
-from typing import Any, Tuple, Dict, List
-import numpy as np
+from datetime import UTC, datetime
+from typing import Any
 
+import numpy as np
 from pyobs.images import Image
-from pyobs.interfaces import ICamera, IWindow, IBinning, ITemperatures, IAbortable, ICooling
+from pyobs.interfaces import IAbortable, IBinning, ICamera, ICooling, ITemperatures, IWindow
+from pyobs.interfaces.IBinning import BinningCapabilities, BinningState
+from pyobs.interfaces.ICooling import CoolingState
+from pyobs.interfaces.ITemperatures import SensorReading, TemperaturesState
+from pyobs.interfaces.IWindow import WindowCapabilities, WindowState
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils.enums import ExposureStatus
-
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +30,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
         """
         BaseCamera.__init__(self, **kwargs)
-        from .sbigudrv import SBIGImg, SBIGCam  # type: ignore
+        from .sbigudrv import SBIGCam, SBIGImg  # type: ignore
 
         # create image and cam
         self._img = SBIGImg()
@@ -38,12 +41,14 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
         # cooling
         self._setpoint = setpoint
-        self._cooling = (False, 0.0, 0.0)
 
         # window and binning
         self._full_frame = (0, 0, 0, 0)
         self._window = (0, 0, 0, 0)
         self._binning = (1, 1)
+
+        # background task for polling cooling/temperature
+        self.add_background_task(self._poll_cooling)
 
     async def open(self) -> None:
         """Open module.
@@ -58,7 +63,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         try:
             self._cam.establish_link()
         except ValueError as e:
-            raise ValueError("Could not establish link: %s" % str(e))
+            raise ValueError(f"Could not establish link: {e}")
 
         # cooling
         await self.set_cooling(self._setpoint is not None, self._setpoint)
@@ -66,25 +71,26 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         # get full frame
         self._cam.binning = (1, 1)
         self._full_frame = self._cam.full_frame
-
-        # get window
         self._window = self._full_frame
 
-    async def get_full_frame(self, **kwargs: Any) -> Tuple[int, int, int, int]:
-        """Returns full size of CCD.
-
-        Returns:
-            Tuple with left, top, width, and height set.
-        """
-        return self._full_frame
-
-    async def get_window(self, **kwargs: Any) -> Tuple[int, int, int, int]:
-        """Returns the camera window.
-
-        Returns:
-            Tuple with left, top, width, and height set.
-        """
-        return self._window
+        # publish capabilities and initial state
+        await self.comm.set_capabilities(
+            IWindow,
+            WindowCapabilities(
+                full_frame_x=self._full_frame[0],
+                full_frame_y=self._full_frame[1],
+                full_frame_width=self._full_frame[2],
+                full_frame_height=self._full_frame[3],
+            ),
+        )
+        await self.comm.set_state(
+            IWindow, WindowState(x=self._window[0], y=self._window[1], width=self._window[2], height=self._window[3])
+        )
+        await self.comm.set_capabilities(
+            IBinning,
+            BinningCapabilities(binnings=[BinningState(x=1, y=1), BinningState(x=2, y=2), BinningState(x=3, y=3)]),
+        )
+        await self.comm.set_state(IBinning, BinningState(x=self._binning[0], y=self._binning[1]))
 
     async def set_window(self, left: int, top: int, width: int, height: int, **kwargs: Any) -> None:
         """Set the camera window.
@@ -97,6 +103,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """
         self._window = (left, top, width, height)
         log.info("Setting window to %dx%d at %d,%d...", width, height, left, top)
+        await self.comm.set_state(IWindow, WindowState(x=left, y=top, width=width, height=height))
 
     async def _expose(self, exposure_time: float, open_shutter: bool, abort_event: asyncio.Event) -> Image:
         """Actually do the exposure, should be implemented by derived classes.
@@ -135,7 +142,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
             # get date obs
             log.info("Starting exposure with for %.2f seconds...", exposure_time)
-            date_obs = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
+            date_obs = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
             # init image
             self._img.image_can_close = False
@@ -210,17 +217,6 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """
         await self._change_exposure_status(ExposureStatus.IDLE)
 
-    async def list_binnings(self, **kwargs: Any) -> List[Tuple[int, int]]:
-        return [(1, 1), (2, 2), (3, 3)]
-
-    async def get_binning(self, **kwargs: Any) -> Tuple[int, int]:
-        """Returns the camera binning.
-
-        Returns:
-            Dictionary with x and y.
-        """
-        return self._binning
-
     async def set_binning(self, x: int, y: int, **kwargs: Any) -> None:
         """Set the camera binning.
 
@@ -230,6 +226,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """
         self._binning = (x, y)
         log.info("Setting binning to %dx%d...", x, y)
+        await self.comm.set_state(IBinning, BinningState(x=x, y=y))
 
     async def set_cooling(self, enabled: bool, setpoint: float, **kwargs: Any) -> None:
         """Enables/disables cooling and sets setpoint.
@@ -252,53 +249,24 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         async with self._lock_active:
             self._cam.set_cooling(enabled, setpoint)
 
-    async def get_cooling(self, **kwargs: Any) -> Tuple[bool, float, float]:
-        """Returns the current status for the cooling.
+        # publish state (power unknown until next poll)
+        await self.comm.set_state(ICooling, CoolingState(setpoint=setpoint, power=None, enabled=enabled))
 
-        Returns:
-            (tuple): Tuple containing:
-                Enabled:  Whether the cooling is enabled
-                SetPoint: Setpoint for the cooling in celsius.
-                Power:    Current cooling power in percent or None.
-        """
-
-        async with self._lock_active:
-            enabled, _, setpoint, power = self._cam.get_cooling()
-            return enabled, setpoint, power
-
-    async def get_cooling_status(self, **kwargs: Any) -> Tuple[bool, float, float]:
-        """Returns the current status for the cooling.
-
-        Returns:
-            Tuple containing:
-                Enabled (bool):         Whether the cooling is enabled
-                SetPoint (float):       Setpoint for the cooling in celsius.
-                Power (float):          Current cooling power in percent or None.
-        """
-
-        try:
-            async with self._lock_active:
-                enabled, temp, setpoint, power = self._cam.get_cooling()
-            self._cooling = enabled is True, setpoint, power * 100.0
-        except ValueError:
-            # use existing cooling
-            pass
-        return self._cooling
-
-    async def get_temperatures(self, **kwargs: Any) -> Dict[str, float]:
-        """Returns all temperatures measured by this module.
-
-        Returns:
-            Dict containing temperatures.
-        """
-
-        try:
-            async with self._lock_active:
-                _, temp, _, _ = self._cam.get_cooling()
-            return {"CCD": temp}
-        except ValueError:
-            # use existing temps
-            return {}
+    async def _poll_cooling(self) -> None:
+        """Background task: periodically reads cooling status and publishes ICooling and ITemperatures state."""
+        while True:
+            try:
+                async with self._lock_active:
+                    enabled, temp, setpoint, power = self._cam.get_cooling()
+                await self.comm.set_state(
+                    ICooling, CoolingState(setpoint=setpoint, power=round(power * 100), enabled=enabled)
+                )
+                await self.comm.set_state(
+                    ITemperatures, TemperaturesState(readings=[SensorReading(name="CCD", value=temp)])
+                )
+            except Exception:
+                pass
+            await asyncio.sleep(10)
 
 
 __all__ = ["SbigCamera"]
