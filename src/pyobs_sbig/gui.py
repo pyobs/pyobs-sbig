@@ -1,21 +1,18 @@
-from astropy.io import fits
-from pyobs.utils.enums import ImageFormat
-from pyobs.utils.gui.camera import (
-    DataDisplayWidget,
-    BinningWidget,
-    ImageFormatWidget,
-    ExposureTimeWidget,
-    ExposeWidget,
-    ListPickerDialog,
-)
-from pyobs.utils.gui.camera.windowingwidget import WindowingWidget
-from pyobs.utils.parallel import event_wait
 import asyncio
 import sys
+
 import qasync  # type: ignore
+from astropy.io import fits
+from pyobs.utils.gui.camera import (
+    BinningWidget,
+    DataDisplayWidget,
+    ExposeWidget,
+    ExposureTimeWidget,
+)
+from pyobs.utils.gui.camera.windowingwidget import WindowingWidget
 from PySide6 import QtWidgets
 
-from .sbigudrv import SBIGImg, SBIGCam  # type: ignore
+from .sbigudrv import SBIGCam, SBIGImg  # type: ignore
 
 
 class MainWindow(QtWidgets.QMainWindow):
