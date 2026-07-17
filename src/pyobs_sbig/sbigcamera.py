@@ -12,6 +12,7 @@ from pyobs.interfaces.ICooling import CoolingState
 from pyobs.interfaces.ITemperatures import SensorReading, TemperaturesState
 from pyobs.interfaces.IWindow import WindowCapabilities, WindowState
 from pyobs.modules.camera.basecamera import BaseCamera
+from pyobs.utils import exceptions as exc
 from pyobs.utils.enums import ExposureStatus
 
 log = logging.getLogger(__name__)
@@ -159,7 +160,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             while not self._cam.has_exposure_finished():
                 # was aborted?
                 if abort_event.is_set():
-                    raise InterruptedError("Exposure aborted.")
+                    raise exc.AbortedError("Exposure aborted.")
                 await asyncio.sleep(0.01)
 
             # finish exposure

@@ -8,6 +8,7 @@ from pyobs.interfaces import IFilters, IReady
 from pyobs.interfaces.IFilters import FiltersCapabilities, FilterState
 from pyobs.interfaces.IReady import ReadyState
 from pyobs.mixins import MotionStatusMixin
+from pyobs.utils import exceptions as exc
 from pyobs.utils.enums import MotionStatus
 from pyobs.utils.threads import LockWithAbort
 
@@ -165,7 +166,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
                 # abort?
                 if self._abort_motion.is_set():
-                    raise InterruptedError("Filter change aborted.")
+                    raise exc.AbortedError("Filter change aborted.")
 
                 # sleep a little
                 await asyncio.sleep(0.1)
