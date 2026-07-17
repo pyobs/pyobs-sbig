@@ -128,7 +128,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             filter_name: Name of filter to set.
 
         Raises:
-            ValueError: If binning could not be set.
+            InvalidArgumentError: If filter_name is unknown.
             NotImplementedError: If camera doesn't have a filter wheel.
         """
         from .sbigudrv import FilterWheelModel, FilterWheelStatus
@@ -140,7 +140,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # reverse dict and search for name
         filters = {y: x for x, y in self._filter_names.items()}
         if filter_name not in filters:
-            raise ValueError(f"Unknown filter: {filter_name}")
+            raise exc.InvalidArgumentError(f"Unknown filter: {filter_name}")
 
         # there already?
         position, status = self._cam.get_filter_position_and_status()
