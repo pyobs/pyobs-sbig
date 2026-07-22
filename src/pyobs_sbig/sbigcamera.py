@@ -1,8 +1,11 @@
 import asyncio
 import logging
 import math
+import threading
+import time
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar, cast
 
 import numpy as np
 from pyobs.images import Image
@@ -16,6 +19,17 @@ from pyobs.utils import exceptions as exc
 from pyobs.utils.enums import ExposureStatus
 
 log = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
+
+# SBIG SDK calls are blocking and are made directly on the event loop thread (see
+# _run_blocking). If the camera has gone unresponsive, they can hang indefinitely, so they're
+# bounded with a timeout rather than let a single dead camera freeze the whole module.
+_SDK_CALL_TIMEOUT = 5.0
+
+# the exposure-wait loop's own timeout needs to cover the actual exposure time plus some margin
+# for overhead -- exposure_time alone would be too tight.
+_EXPOSURE_WAIT_MARGIN = 30.0
 
 
 class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures, IAbortable):
@@ -51,6 +65,55 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         # background task for polling cooling/temperature
         self.add_background_task(self._poll_cooling)
 
+    @staticmethod
+    async def _run_blocking(func: Callable[[], None], timeout: float = _SDK_CALL_TIMEOUT) -> bool:
+        """Run a blocking SBIG SDK call in a daemon thread, so a hung call can't freeze the module.
+
+        A plain executor isn't used here, since its worker threads are non-daemon and Python joins
+        them on interpreter shutdown -- a hung call would then just move the freeze to process exit.
+
+        Returns:
+            True if func completed within timeout, False if it's still running in the background.
+        """
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[None] = loop.create_future()
+
+        def _wrapper() -> None:
+            try:
+                func()
+            finally:
+                loop.call_soon_threadsafe(future.set_result, None)
+
+        threading.Thread(target=_wrapper, daemon=True).start()
+        try:
+            await asyncio.wait_for(future, timeout=timeout)
+            return True
+        except TimeoutError:
+            return False
+
+    async def _run_blocking_or_raise(self, func: Callable[[], _T], timeout: float = _SDK_CALL_TIMEOUT) -> _T:
+        """Run a blocking SBIG SDK call in a thread, returning its result or re-raising what it raised.
+
+        Unlike _run_blocking(), this also carries the callable's return value/exception back to the
+        caller -- several SBIG calls here drive control flow via their return value or a raised
+        ValueError (e.g. establishing the link), which a bare fire-and-forget thread call would
+        otherwise silently lose.
+        """
+        outcome: list[Any] = []
+
+        def _wrapper() -> None:
+            try:
+                outcome.append(func())
+            except BaseException as e:
+                outcome.append(e)
+
+        if not await self._run_blocking(_wrapper, timeout=timeout):
+            raise TimeoutError(f"Timed out waiting for SBIG SDK call after {timeout}s.")
+        value = outcome[0]
+        if isinstance(value, BaseException):
+            raise value
+        return cast(_T, value)
+
     async def open(self) -> None:
         """Open module.
 
@@ -61,17 +124,24 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
         # open driver
         log.info("Opening SBIG driver...")
-        try:
-            self._cam.establish_link()
-        except ValueError as e:
-            raise ValueError(f"Could not establish link: {e}")
+
+        def _connect() -> None:
+            try:
+                self._cam.establish_link()
+            except ValueError as e:
+                raise ValueError(f"Could not establish link: {e}")
+
+        await self._run_blocking_or_raise(_connect)
 
         # cooling
         await self.set_cooling(self._setpoint is not None, self._setpoint)
 
         # get full frame
-        self._cam.binning = (1, 1)
-        self._full_frame = self._cam.full_frame
+        def _get_full_frame() -> tuple[int, int, int, int]:
+            self._cam.binning = (1, 1)
+            return self._cam.full_frame
+
+        self._full_frame = await self._run_blocking_or_raise(_get_full_frame)
         self._window = self._full_frame
 
         # publish capabilities and initial state
@@ -145,26 +215,36 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             log.info("Starting exposure with for %.2f seconds...", exposure_time)
             date_obs = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
-            # init image
-            self._img.image_can_close = False
+            def _start() -> None:
+                # init image
+                self._img.image_can_close = False
 
-            # set exposure time, window and binning
-            self._cam.exposure_time = exposure_time
-            self._cam.window = window
-            self._cam.binning = binning
+                # set exposure time, window and binning
+                self._cam.exposure_time = exposure_time
+                self._cam.window = window
+                self._cam.binning = binning
 
-            # start exposure
-            self._cam.start_exposure(self._img, open_shutter)
+                # start exposure
+                self._cam.start_exposure(self._img, open_shutter)
 
-            # wait for it
-            while not self._cam.has_exposure_finished():
-                # was aborted?
-                if abort_event.is_set():
-                    raise exc.AbortedError("Exposure aborted.")
-                await asyncio.sleep(0.01)
+            await self._run_blocking_or_raise(_start)
+
+            # wait for it -- runs the whole poll loop as a single blocking call (see _run_blocking),
+            # rather than polling has_exposure_finished() every 10ms directly on the event loop
+            def _wait() -> bool:
+                while not self._cam.has_exposure_finished():
+                    if abort_event.is_set():
+                        return True
+                    time.sleep(0.01)
+                return False
+
+            exposure_timeout = exposure_time + _EXPOSURE_WAIT_MARGIN
+            aborted = await self._run_blocking_or_raise(_wait, timeout=exposure_timeout)
+            if aborted:
+                raise exc.AbortedError("Exposure aborted.")
 
             # finish exposure
-            self._cam.end_exposure()
+            await self._run_blocking_or_raise(self._cam.end_exposure)
 
             # wait for readout
             log.info("Exposure finished, reading out...")
@@ -181,7 +261,10 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             data = self._img.data
 
             # temp & cooling
-            _, temp, setpoint, _ = self._cam.get_cooling()
+            def _get_cooling() -> tuple[Any, float, float, Any]:
+                return self._cam.get_cooling()
+
+            _, temp, setpoint, _ = await self._run_blocking_or_raise(_get_cooling)
 
             # create FITS image and set header
             img = Image(data)
@@ -247,8 +330,11 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             log.info("Disabling cooling and setting setpoint to 20°C...")
 
         # do it
-        async with self._lock_active:
+        def _set() -> None:
             self._cam.set_cooling(enabled, setpoint)
+
+        async with self._lock_active:
+            await self._run_blocking_or_raise(_set)
 
         # publish state (power unknown until next poll)
         await self.comm.set_state(ICooling, CoolingState(setpoint=setpoint, power=None, enabled=enabled))
@@ -257,8 +343,12 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """Background task: periodically reads cooling status and publishes ICooling and ITemperatures state."""
         while True:
             try:
+
+                def _get() -> tuple[bool, float, float, float]:
+                    return self._cam.get_cooling()
+
                 async with self._lock_active:
-                    enabled, temp, setpoint, power = self._cam.get_cooling()
+                    enabled, temp, setpoint, power = await self._run_blocking_or_raise(_get)
                 await self.comm.set_state(
                     ICooling, CoolingState(setpoint=setpoint, power=round(power * 100), enabled=enabled)
                 )

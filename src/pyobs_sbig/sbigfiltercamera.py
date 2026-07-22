@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import Any
 
 from pyobs.events import FilterChangedEvent
@@ -15,6 +16,10 @@ from pyobs.utils.threads import LockWithAbort
 from .sbigcamera import SbigCamera
 
 log = logging.getLogger(__name__)
+
+# the filter-wheel wait loop's own timeout, since a physical filter change can legitimately take
+# longer than SbigCamera's default SDK-call timeout.
+_FILTER_WAIT_TIMEOUT = 30.0
 
 
 class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
@@ -62,10 +67,14 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # set filter wheel model
         if self.filter_wheel != FilterWheelModel.UNKNOWN:
             log.info("Initialising filter wheel...")
-            try:
-                self._cam.set_filter_wheel(self.filter_wheel)
-            except ValueError as e:
-                raise ValueError(f"Could not set filter wheel: {e}")
+
+            def _set_wheel() -> None:
+                try:
+                    self._cam.set_filter_wheel(self.filter_wheel)
+                except ValueError as e:
+                    raise ValueError(f"Could not set filter wheel: {e}")
+
+            await self._run_blocking_or_raise(_set_wheel)
 
         # open camera (connects to hardware, publishes IWindow/IBinning states)
         await SbigCamera.open(self)
@@ -87,7 +96,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
             # query and publish current filter position
             try:
-                self._position, _ = self._cam.get_filter_position_and_status()
+                self._position, _ = await self._run_blocking_or_raise(self._cam.get_filter_position_and_status)
             except (ValueError, Exception):
                 pass
             await self.comm.set_state(IFilters, FilterState(filter=self._filter_names[self._position]))
@@ -143,7 +152,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
             raise exc.InvalidArgumentError(f"Unknown filter: {filter_name}")
 
         # there already?
-        position, status = self._cam.get_filter_position_and_status()
+        position, status = await self._run_blocking_or_raise(self._cam.get_filter_position_and_status)
         if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
             log.info("Filter changed.")
             return
@@ -155,24 +164,31 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         async with LockWithAbort(self._lock_motion, self._abort_motion):
             # set it
             log.info("Changing filter to %s...", filter_name)
-            self._cam.set_filter(filters[filter_name])
+            target = filters[filter_name]
 
-            # wait for it
-            while True:
-                # break, if wheel is idle and filter is set
-                position, status = self._cam.get_filter_position_and_status()
-                if position == filters[filter_name] and status == FilterWheelStatus.IDLE:
-                    break
+            def _set_filter() -> None:
+                self._cam.set_filter(target)
 
-                # abort?
-                if self._abort_motion.is_set():
-                    raise exc.AbortedError("Filter change aborted.")
+            await self._run_blocking_or_raise(_set_filter)
 
-                # sleep a little
-                await asyncio.sleep(0.1)
+            # wait for it -- runs the whole poll loop as a single blocking call (see
+            # SbigCamera._run_blocking), rather than polling get_filter_position_and_status()
+            # every 100ms directly on the event loop
+            def _wait() -> bool:
+                while True:
+                    position, status = self._cam.get_filter_position_and_status()
+                    if position == target and status == FilterWheelStatus.IDLE:
+                        return False
+                    if self._abort_motion.is_set():
+                        return True
+                    time.sleep(0.1)
+
+            aborted = await self._run_blocking_or_raise(_wait, timeout=_FILTER_WAIT_TIMEOUT)
+            if aborted:
+                raise exc.AbortedError("Filter change aborted.")
 
             # update cached position and publish new state
-            self._position = filters[filter_name]
+            self._position = target
             log.info("Filter changed.")
             await self.comm.send_event(FilterChangedEvent(filter_name))
             await self.comm.set_state(IFilters, FilterState(filter=filter_name))
