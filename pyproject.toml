@@ -1,19 +1,19 @@
 [project]
 name = "pyobs-sbig"
-version = "2.0.0.dev6"
+version = "2.0.0.dev7"
 description = "pyobs module for SBIG cameras"
 authors = [{ name = "Tim-Oliver Husser", email = "thusser@uni-goettingen.de" }]
-requires-python = ">=3.11,<3.15"
+requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
     "astropy>=7.0.1,<8",
     "numpy>=2.2.5,<3",
-    "pyobs-core>=2.0.0.dev6,<3",
+    "pyobs-core>=2.0.0.dev48,<3",
 ]
 
 [project.optional-dependencies]
 gui = [
-    "pyobs-core[gui]>=2.0.0.dev6,<3",
+    "pyobs-core[gui]>=2.0.0.dev48,<3",
     "qasync>=0.28.0",
 ]
 
@@ -34,6 +34,15 @@ py-modules = []
 
 [tool.scikit-build]
 wheel.packages = ["src/pyobs_sbig"]
+
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux_* *-manylinux_i686"
+archs = ["x86_64"]
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+before-all = "dnf install -y epel-release && dnf install -y cfitsio-devel libusbx-devel systemd-devel"
 
 [build-system]
 requires = ["scikit_build_core>=0.12", "cython>=3.0", "cython-cmake", "numpy>=2.0"]

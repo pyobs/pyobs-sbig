@@ -57,24 +57,25 @@ set_target_properties(sbigudrv PROPERTIES
   OUTPUT_NAME "sbigudrv"
   SUFFIX "${PY_EXT_SUFFIX}"
   POSITION_INDEPENDENT_CODE ON
+  INSTALL_RPATH "$ORIGIN"
+  BUILD_WITH_INSTALL_RPATH ON
 )
 message(STATUS "ext: ${PY_EXT_SUFFIX}")
 
-# --- sbigudrv ---
-target_include_directories(sbigudrv PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/lib/usr/local/include/
-)
-
 # --- Link ---
 find_library(CFITSIO_LIB cfitsio REQUIRED)
-find_path(CFITSIO_INCLUDE_DIR fitsio.h REQUIRED)
+find_path(CFITSIO_INCLUDE_DIR NAMES fitsio.h PATH_SUFFIXES cfitsio REQUIRED)
 target_include_directories(sbigudrv PRIVATE ${CFITSIO_INCLUDE_DIR})
 target_link_libraries(sbigudrv PRIVATE ${CFITSIO_LIB})
 
-find_library(SBIGUDRV_LIB sbigudrv REQUIRED PATHS /usr/local/lib)
+# --- Bundled SBIG Universal Driver (pre-compiled, shipped in lib/) ---
+set(SBIGUDRV_LIB "${CMAKE_CURRENT_SOURCE_DIR}/lib/libsbigudrv.so")
 target_link_libraries(sbigudrv PRIVATE ${SBIGUDRV_LIB})
 
 # --- Install into package ---
 install(TARGETS sbigudrv
   LIBRARY DESTINATION ${SKBUILD_PROJECT_NAME}
+)
+install(FILES ${SBIGUDRV_LIB}
+  DESTINATION ${SKBUILD_PROJECT_NAME}
 )
