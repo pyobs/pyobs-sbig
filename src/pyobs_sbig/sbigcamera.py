@@ -10,7 +10,7 @@ from typing import Any, TypeVar, cast
 import numpy as np
 from pyobs.images import Image
 from pyobs.interfaces import IAbortable, IBinning, ICamera, ICooling, ITemperatures, IWindow
-from pyobs.interfaces.IBinning import BinningCapabilities, BinningState
+from pyobs.interfaces.IBinning import Binning, BinningCapabilities, BinningState
 from pyobs.interfaces.ICooling import CoolingState
 from pyobs.interfaces.ITemperatures import SensorReading, TemperaturesState
 from pyobs.interfaces.IWindow import WindowCapabilities, WindowState
@@ -159,7 +159,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         )
         await self.comm.set_capabilities(
             IBinning,
-            BinningCapabilities(binnings=[BinningState(x=1, y=1), BinningState(x=2, y=2), BinningState(x=3, y=3)]),
+            BinningCapabilities(binnings=[Binning(x=1, y=1), Binning(x=2, y=2), Binning(x=3, y=3)]),
         )
         await self.comm.set_state(IBinning, BinningState(x=self._binning[0], y=self._binning[1]))
 
