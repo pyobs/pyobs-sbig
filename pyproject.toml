@@ -64,6 +64,7 @@ select = ["E", "F", "W", "I", "UP", "G"]
 [tool.pyrefly]
 python-version = "3.11"
 ignore-missing-imports = ["PySide6.*", "qasync.*"]
+project-excludes = ["src/pyobs_sbig/gui.py"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
