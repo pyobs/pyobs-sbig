@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import time
 
 import qasync  # type: ignore
 from astropy.io import fits
@@ -54,26 +55,45 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @qasync.asyncSlot()  # type: ignore
     async def _expose_clicked(self) -> None:
+        # get current binning from the widget
+        binning = self.binning_widget._binnings[self.binning_widget.combo_binnings.currentIndex()]
+
         # init image
         self._img.image_can_close = False
 
-        # set exposure time, window and binning
-        self._cam.exposure_time = self.exposure_time.value
-        self._cam.window = self.window_widget.values
-        self._cam.binning = (1, 1)
+        loop = asyncio.get_running_loop()
 
-        # start exposure
-        self._cam.start_exposure(self._img, False)
+        # set exposure time, window and binning, then start the exposure off the Qt thread
+        def _start() -> None:
+            self._cam.exposure_time = self.exposure_time.value
+            self._cam.window = self.window_widget.values
+            self._cam.binning = binning
+            self._cam.start_exposure(self._img, False)
 
-        # wait for it
-        while not self._cam.has_exposure_finished():
-            await asyncio.sleep(0.01)
+        self.abort_exposure.clear()
+        await loop.run_in_executor(None, _start)
+
+        # wait for it off the Qt thread, checking the abort event
+        def _wait() -> bool:
+            while not self._cam.has_exposure_finished():
+                if self.abort_exposure.is_set():
+                    return True
+                time.sleep(0.01)
+            return False
+
+        aborted = await loop.run_in_executor(None, _wait)
+
+        if aborted:
+            # abort the exposure in the camera
+            await loop.run_in_executor(None, self._cam.end_exposure)
+            self._img.image_can_close = True
+            self.expose.set_exposures_left()
+            return
 
         # finish exposure
-        self._cam.end_exposure()
+        await loop.run_in_executor(None, self._cam.end_exposure)
 
         # wait for readout
-        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._cam.readout, self._img, False)
 
         # finalize image
@@ -89,7 +109,10 @@ class MainWindow(QtWidgets.QMainWindow):
     @qasync.asyncSlot()  # type: ignore
     async def _abort_clicked(self) -> None:
         self.abort_exposure.set()
-        self.abort_exposure = asyncio.Event()
+
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        self._cam.close()
+        super().closeEvent(event)
 
 
 async def async_main(app: QtWidgets.QApplication) -> None:
