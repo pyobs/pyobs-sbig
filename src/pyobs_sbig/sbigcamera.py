@@ -171,9 +171,12 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """Close module and release the camera link."""
         await BaseCamera.close(self)
 
-        # release the SBIG device/driver link
-        if not await self._run_blocking(self._cam.close):
-            log.error("Timed out closing SBIG camera after %.1fs.", _SDK_CALL_TIMEOUT)
+        # take the same lock _expose()/set_filter() use, so close can't tear down the driver
+        # out from under a live exposure or filter move
+        async with self._lock_cam:
+            # release the SBIG device/driver link
+            if not await self._run_blocking(self._cam.close):
+                log.error("Timed out closing SBIG camera after %.1fs.", _SDK_CALL_TIMEOUT)
 
     async def set_window(self, left: int, top: int, width: int, height: int, **kwargs: Any) -> None:
         """Set the camera window.
