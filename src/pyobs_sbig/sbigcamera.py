@@ -54,6 +54,10 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         # active lock
         self._lock_active = asyncio.Lock()
 
+        # shared lock guarding all access to the non-reentrant CSBIGCam object, so an exposure and
+        # a filter move (which uses its own _lock_motion) can never overlap on the same driver
+        self._lock_cam = asyncio.Lock()
+
         # cooling
         self._setpoint = setpoint
 
@@ -163,6 +167,14 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         )
         await self.comm.set_state(IBinning, BinningState(x=self._binning[0], y=self._binning[1]))
 
+    async def close(self) -> None:
+        """Close module and release the camera link."""
+        await BaseCamera.close(self)
+
+        # release the SBIG device/driver link
+        if not await self._run_blocking(self._cam.close):
+            log.error("Timed out closing SBIG camera after %.1fs.", _SDK_CALL_TIMEOUT)
+
     async def set_window(self, left: int, top: int, width: int, height: int, **kwargs: Any) -> None:
         """Set the camera window.
 
@@ -180,7 +192,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
-            exposure_time: The requested exposure time in ms.
+            exposure_time: The requested exposure time in seconds.
             open_shutter: Whether or not to open the shutter.
             abort_event: Event that gets triggered when exposure should be aborted.
 
@@ -191,107 +203,109 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             pyobs.utils.exceptions.GrabImageError: If exposure was not successful.
         """
 
-        async with self._lock_active:
-            #  binning
-            binning = self._binning
+        async with self._lock_cam:
+            async with self._lock_active:
+                #  binning
+                binning = self._binning
 
-            # set window, CSBIGCam expects left/top also in binned coordinates, so divide by binning
-            left = int(math.floor(self._window[0]) / binning[0])
-            top = int(math.floor(self._window[1]) / binning[1])
-            width = int(math.floor(self._window[2]) / binning[0])
-            height = int(math.floor(self._window[3]) / binning[1])
-            log.info(
-                "Set window to %dx%d (binned %dx%d) at %d,%d.",
-                self._window[2],
-                self._window[3],
-                width,
-                height,
-                left,
-                top,
-            )
-            window = (left, top, width, height)
+                # set window, CSBIGCam expects left/top also in binned coordinates, so divide by binning
+                left = int(math.floor(self._window[0]) / binning[0])
+                top = int(math.floor(self._window[1]) / binning[1])
+                width = int(math.floor(self._window[2]) / binning[0])
+                height = int(math.floor(self._window[3]) / binning[1])
+                log.info(
+                    "Set window to %dx%d (binned %dx%d) at %d,%d.",
+                    self._window[2],
+                    self._window[3],
+                    width,
+                    height,
+                    left,
+                    top,
+                )
+                window = (left, top, width, height)
 
-            # get date obs
-            log.info("Starting exposure with for %.2f seconds...", exposure_time)
-            date_obs = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
+                # get date obs
+                log.info("Starting exposure with for %.2f seconds...", exposure_time)
+                date_obs = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
-            def _start() -> None:
-                # init image
-                self._img.image_can_close = False
+                def _start() -> None:
+                    # init image
+                    self._img.image_can_close = False
 
-                # set exposure time, window and binning
-                self._cam.exposure_time = exposure_time
-                self._cam.window = window
-                self._cam.binning = binning
+                    # set exposure time, window and binning
+                    self._cam.exposure_time = exposure_time
+                    self._cam.window = window
+                    self._cam.binning = binning
 
-                # start exposure
-                self._cam.start_exposure(self._img, open_shutter)
+                    # start exposure
+                    self._cam.start_exposure(self._img, open_shutter)
 
-            await self._run_blocking_or_raise(_start)
+                await self._run_blocking_or_raise(_start)
 
-            # wait for it -- runs the whole poll loop as a single blocking call (see _run_blocking),
-            # rather than polling has_exposure_finished() every 10ms directly on the event loop
-            def _wait() -> bool:
-                while not self._cam.has_exposure_finished():
-                    if abort_event.is_set():
-                        return True
-                    time.sleep(0.01)
-                return False
+                # wait for it -- runs the whole poll loop as a single blocking call (see
+                # _run_blocking), rather than polling has_exposure_finished() every 10ms directly
+                # on the event loop
+                def _wait() -> bool:
+                    while not self._cam.has_exposure_finished():
+                        if abort_event.is_set():
+                            return True
+                        time.sleep(0.01)
+                    return False
 
-            exposure_timeout = exposure_time + _EXPOSURE_WAIT_MARGIN
-            aborted = await self._run_blocking_or_raise(_wait, timeout=exposure_timeout)
-            if aborted:
-                raise exc.AbortedError("Exposure aborted.")
+                exposure_timeout = exposure_time + _EXPOSURE_WAIT_MARGIN
+                aborted = await self._run_blocking_or_raise(_wait, timeout=exposure_timeout)
+                if aborted:
+                    raise exc.AbortedError("Exposure aborted.")
 
-            # finish exposure
-            await self._run_blocking_or_raise(self._cam.end_exposure)
+                # finish exposure
+                await self._run_blocking_or_raise(self._cam.end_exposure)
 
-            # wait for readout
-            log.info("Exposure finished, reading out...")
-            await self._change_exposure_status(ExposureStatus.READOUT)
+                # wait for readout
+                log.info("Exposure finished, reading out...")
+                await self._change_exposure_status(ExposureStatus.READOUT)
 
-            # start readout (can raise ValueError)
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, self._cam.readout, self._img, open_shutter)
+                # start readout (can raise ValueError)
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, self._cam.readout, self._img, open_shutter)
 
-            # finalize image
-            self._img.image_can_close = True
+                # finalize image
+                self._img.image_can_close = True
 
-            # download data
-            data = self._img.data
+                # download data
+                data = self._img.data
 
-            # temp & cooling
-            def _get_cooling() -> tuple[Any, float, float, Any]:
-                return self._cam.get_cooling()
+                # temp & cooling
+                def _get_cooling() -> tuple[Any, float, float, Any]:
+                    return self._cam.get_cooling()
 
-            _, temp, setpoint, _ = await self._run_blocking_or_raise(_get_cooling)
+                _, temp, setpoint, _ = await self._run_blocking_or_raise(_get_cooling)
 
-            # create FITS image and set header
-            img = Image(data)
-            img.header["DATE-OBS"] = (date_obs, "Date and time of start of exposure")
-            img.header["EXPTIME"] = (exposure_time, "Exposure time [s]")
-            img.header["DET-TEMP"] = (temp, "CCD temperature [C]")
-            img.header["DET-TSET"] = (setpoint, "Cooler setpoint [C]")
+                # create FITS image and set header
+                img = Image(data)
+                img.header["DATE-OBS"] = (date_obs, "Date and time of start of exposure")
+                img.header["EXPTIME"] = (exposure_time, "Exposure time [s]")
+                img.header["DET-TEMP"] = (temp, "CCD temperature [C]")
+                img.header["DET-TSET"] = (setpoint, "Cooler setpoint [C]")
 
-            # binning
-            img.header["XBINNING"] = img.header["DET-BIN1"] = (self._binning[0], "Binning factor used on X axis")
-            img.header["YBINNING"] = img.header["DET-BIN2"] = (self._binning[1], "Binning factor used on Y axis")
+                # binning
+                img.header["XBINNING"] = img.header["DET-BIN1"] = (self._binning[0], "Binning factor used on X axis")
+                img.header["YBINNING"] = img.header["DET-BIN2"] = (self._binning[1], "Binning factor used on Y axis")
 
-            # window
-            img.header["XORGSUBF"] = (self._window[0], "Subframe origin on X axis")
-            img.header["YORGSUBF"] = (self._window[1], "Subframe origin on Y axis")
+                # window
+                img.header["XORGSUBF"] = (self._window[0], "Subframe origin on X axis")
+                img.header["YORGSUBF"] = (self._window[1], "Subframe origin on Y axis")
 
-            # statistics
-            img.header["DATAMIN"] = (float(np.min(data)), "Minimum data value")
-            img.header["DATAMAX"] = (float(np.max(data)), "Maximum data value")
-            img.header["DATAMEAN"] = (float(np.mean(data)), "Mean data value")
+                # statistics
+                img.header["DATAMIN"] = (float(np.min(data)), "Minimum data value")
+                img.header["DATAMAX"] = (float(np.max(data)), "Maximum data value")
+                img.header["DATAMEAN"] = (float(np.mean(data)), "Mean data value")
 
-            # biassec/trimsec
-            self.set_biassec_trimsec(img.header, *self._full_frame)
+                # biassec/trimsec
+                self.set_biassec_trimsec(img.header, *self._full_frame)
 
-            # return FITS image
-            log.info("Readout finished.")
-            return img
+                # return FITS image
+                log.info("Readout finished.")
+                return img
 
     async def _abort_exposure(self) -> None:
         """Abort the running exposure. Should be implemented by derived class.

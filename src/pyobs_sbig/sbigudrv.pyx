@@ -72,6 +72,10 @@ cdef class SBIGImg:
     def __cinit__(self):
         self.obj = new CSBIGImg()
 
+    def __dealloc__(self):
+        if self.obj != NULL:
+            del self.obj
+
     @property
     def image_can_close(self) -> bool:
         return self.obj.GetImageCanClose()
@@ -108,6 +112,19 @@ cdef class SBIGCam:
     def __init__(self):
         self.aborted = False
         self.lock = threading.Lock()
+
+    def __dealloc__(self):
+        if self.obj != NULL:
+            del self.obj
+
+    def close(self):
+        """Close the camera device and driver.
+
+        The C++ destructor does this too (via __dealloc__), but closing explicitly lets callers
+        release the link without waiting for the GC to collect the object.
+        """
+        self.obj.CloseDevice()
+        self.obj.CloseDriver()
 
     def establish_link(self):
         res = self.obj.EstablishLink()

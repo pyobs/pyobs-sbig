@@ -108,7 +108,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         """Actually do the exposure, should be implemented by derived classes.
 
         Args:
-            exposure_time: The requested exposure time in ms.
+            exposure_time: The requested exposure time in seconds.
             open_shutter: Whether or not to open the shutter.
             abort_event: Event that gets triggered when exposure should be aborted.
 
@@ -160,38 +160,39 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         # set status
         await self._change_motion_status(MotionStatus.SLEWING, interface="IFilters")
 
-        # acquire lock
-        async with LockWithAbort(self._lock_motion, self._abort_motion):
-            # set it
-            log.info("Changing filter to %s...", filter_name)
-            target = filters[filter_name]
+        # acquire the shared camera lock (so the move can't overlap an exposure) and the motion lock
+        async with self._lock_cam:
+            async with LockWithAbort(self._lock_motion, self._abort_motion):
+                # set it
+                log.info("Changing filter to %s...", filter_name)
+                target = filters[filter_name]
 
-            def _set_filter() -> None:
-                self._cam.set_filter(target)
+                def _set_filter() -> None:
+                    self._cam.set_filter(target)
 
-            await self._run_blocking_or_raise(_set_filter)
+                await self._run_blocking_or_raise(_set_filter)
 
-            # wait for it -- runs the whole poll loop as a single blocking call (see
-            # SbigCamera._run_blocking), rather than polling get_filter_position_and_status()
-            # every 100ms directly on the event loop
-            def _wait() -> bool:
-                while True:
-                    position, status = self._cam.get_filter_position_and_status()
-                    if position == target and status == FilterWheelStatus.IDLE:
-                        return False
-                    if self._abort_motion.is_set():
-                        return True
-                    time.sleep(0.1)
+                # wait for it -- runs the whole poll loop as a single blocking call (see
+                # SbigCamera._run_blocking), rather than polling get_filter_position_and_status()
+                # every 100ms directly on the event loop
+                def _wait() -> bool:
+                    while True:
+                        position, status = self._cam.get_filter_position_and_status()
+                        if position == target and status == FilterWheelStatus.IDLE:
+                            return False
+                        if self._abort_motion.is_set():
+                            return True
+                        time.sleep(0.1)
 
-            aborted = await self._run_blocking_or_raise(_wait, timeout=_FILTER_WAIT_TIMEOUT)
-            if aborted:
-                raise exc.AbortedError("Filter change aborted.")
+                aborted = await self._run_blocking_or_raise(_wait, timeout=_FILTER_WAIT_TIMEOUT)
+                if aborted:
+                    raise exc.AbortedError("Filter change aborted.")
 
-            # update cached position and publish new state
-            self._position = target
-            log.info("Filter changed.")
-            await self.comm.send_event(FilterChangedEvent(filter_name))
-            await self.comm.set_state(IFilters, FilterState(filter=filter_name))
+                # update cached position and publish new state
+                self._position = target
+                log.info("Filter changed.")
+                await self.comm.send_event(FilterChangedEvent(filter_name))
+                await self.comm.set_state(IFilters, FilterState(filter=filter_name))
 
         # set status
         await self._change_motion_status(MotionStatus.POSITIONED, interface="IFilters")
