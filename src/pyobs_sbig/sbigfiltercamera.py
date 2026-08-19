@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 _FILTER_WAIT_TIMEOUT = 30.0
 
 
-class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
+class SbigFilterCamera(SbigCamera, MotionStatusMixin, IFilters):
     """A pyobs module for SBIG cameras."""
 
     __module__ = "pyobs_sbig"
@@ -33,7 +33,7 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
         Args:
             filter_names: List of filter names.
         """
-        SbigCamera.__init__(self, **kwargs)
+        super().__init__(motion_status_interfaces=["IFilters"], **kwargs)
         from .sbigudrv import FilterWheelModel, FilterWheelPosition  # type: ignore
 
         # filter wheel
@@ -52,9 +52,6 @@ class SbigFilterCamera(MotionStatusMixin, SbigCamera, IFilters):
 
         # current position
         self._position = FilterWheelPosition.UNKNOWN
-
-        # init mixins
-        MotionStatusMixin.__init__(self, **kwargs, motion_status_interfaces=["IFilters"])
 
     async def open(self) -> None:
         """Open module.
