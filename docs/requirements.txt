@@ -1,1 +1,4 @@
 sphinx-rtd-theme
+astropy>=7.0.1,<8
+numpy>=2.2.5,<3
+pyobs-core>=2.0.0.dev93,<3
