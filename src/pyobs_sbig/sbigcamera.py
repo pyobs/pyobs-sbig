@@ -278,10 +278,10 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
                 data = self._img.data
 
                 # temp & cooling
-                def _get_cooling() -> tuple[Any, float, float, Any]:
+                def _get_cooling() -> tuple[Any, float, float, float]:
                     return self._cam.get_cooling()
 
-                _, temp, setpoint, _ = await self._run_blocking_or_raise(_get_cooling)
+                _, temp, setpoint, power = await self._run_blocking_or_raise(_get_cooling)
 
                 # create FITS image and set header
                 img = Image(data)
@@ -289,6 +289,7 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
                 img.header["EXPTIME"] = (exposure_time, "Exposure time [s]")
                 img.header["DET-TEMP"] = (temp, "CCD temperature [C]")
                 img.header["DET-TSET"] = (setpoint, "Cooler setpoint [C]")
+                img.header["DET-COOL"] = (round(power * 100), "Cooler power [percent]")
 
                 # binning
                 img.header["XBINNING"] = img.header["DET-BIN1"] = (self._binning[0], "Binning factor used on X axis")
