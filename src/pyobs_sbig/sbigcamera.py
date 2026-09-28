@@ -137,9 +137,6 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
 
         await self._run_blocking_or_raise(_connect)
 
-        # cooling
-        await self.set_cooling(self._setpoint is not None, self._setpoint)
-
         # get full frame
         def _get_full_frame() -> tuple[int, int, int, int]:
             self._cam.binning = (1, 1)
@@ -166,6 +163,11 @@ class SbigCamera(BaseCamera, ICamera, IWindow, IBinning, ICooling, ITemperatures
             BinningCapabilities(binnings=[Binning(x=1, y=1), Binning(x=2, y=2), Binning(x=3, y=3)]),
         )
         await self.comm.set_state(IBinning, BinningState(x=self._binning[0], y=self._binning[1]))
+
+    async def full_reset(self, **kwargs: Any) -> None:
+        """Reset the device completely, including cooling."""
+        await self.reset(**kwargs)
+        await self.set_cooling(self._setpoint is not None, self._setpoint)
 
     async def close(self) -> None:
         """Close module and release the camera link."""
