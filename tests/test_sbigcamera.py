@@ -51,6 +51,18 @@ async def test_set_binning() -> None:
 
 
 @pytest.mark.asyncio
+async def test_full_reset_restores_cooling() -> None:
+    camera = SbigCamera(setpoint=-15.0)
+    camera.reset = AsyncMock()  # type: ignore[method-assign]
+    camera.set_cooling = AsyncMock()  # type: ignore[method-assign]
+
+    await camera.full_reset()
+
+    camera.reset.assert_awaited_once()
+    camera.set_cooling.assert_awaited_once_with(True, -15.0)
+
+
+@pytest.mark.asyncio
 async def test_run_blocking_runs_func_and_returns_true() -> None:
     ran: list[bool] = []
 
