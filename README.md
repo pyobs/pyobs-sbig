@@ -38,6 +38,9 @@ filter wheel and adds a single new parameter:
 
     setpoint:
         The initial setpoint in degrees Celsius for the cooling of the camera.
+    cooling_rate_cool, cooling_rate_warm, cooling_ramp_step:
+        The setpoint is changed in steps, by default 2 degC/min when cooling down and 1 degC/min when warming up
+        (the cooler is switched off only after warming up). See *CoolingRampMixin* in *pyobs-core*.
 
 A basic module configuration would look like this:
 
