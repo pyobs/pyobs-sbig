@@ -100,3 +100,61 @@ async def test_run_blocking_or_raise_reraises() -> None:
 
     with pytest.raises(ValueError):
         await camera._run_blocking_or_raise(boom)
+
+
+def make_cooling_camera(temp: float = -9.5, setpoint: float = -10.0, enabled: bool = True) -> SbigCamera:
+    """Camera with a fake SBIG driver whose sensor follows the setpoint."""
+    from unittest.mock import MagicMock
+
+    camera = SbigCamera()
+    camera.comm.set_state = AsyncMock()  # type: ignore[method-assign]
+    state = {"enabled": enabled, "setpoint": setpoint, "temp": temp}
+
+    def set_cooling(on: bool, value: float) -> None:
+        state["enabled"], state["setpoint"] = on, value
+        if on:
+            state["temp"] = value + 0.5
+
+    cam = MagicMock()
+    cam.set_cooling.side_effect = set_cooling
+    cam.get_cooling.side_effect = lambda: (state["enabled"], state["temp"], state["setpoint"], 0.3)
+    camera._cam = cam
+    return camera
+
+
+@pytest.mark.asyncio
+async def test_set_cooling_queues_ramp_without_touching_camera() -> None:
+    camera = make_cooling_camera()
+
+    await camera.set_cooling(True, -20.0)
+
+    assert camera.cooling_ramping
+    camera._cam.set_cooling.assert_not_called()  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_ramp_steps_down_from_hardware_setpoint() -> None:
+    camera = make_cooling_camera()
+    await camera.set_cooling(True, -13.0)
+
+    while camera.cooling_ramping:
+        await camera._cooling_tick()
+
+    calls = camera._cam.set_cooling.call_args_list  # type: ignore[attr-defined]
+    assert [c.args for c in calls] == [(True, -11.0), (True, -12.0), (True, -13.0)]
+
+
+@pytest.mark.asyncio
+async def test_disable_warms_up_then_switches_off_with_20_degrees() -> None:
+    camera = make_cooling_camera()
+    await camera.set_cooling(False, 0.0)
+
+    for _ in range(100):
+        if not camera.cooling_ramping:
+            break
+        await camera._cooling_tick()
+
+    calls = camera._cam.set_cooling.call_args_list  # type: ignore[attr-defined]
+    assert calls[0].args == (True, -9.0)  # raised step by step first
+    assert calls[-1].args == (False, 20.0)
+    assert not camera.cooling_ramping
