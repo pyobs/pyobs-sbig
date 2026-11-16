@@ -336,8 +336,9 @@ class SbigCamera(CoolingRampMixin, BaseCamera, ICamera, IWindow, IBinning, ICool
         await self.comm.set_state(IBinning, BinningState(x=x, y=y))
 
     async def _set_cooling_hardware(self, enabled: bool, setpoint: float | None) -> None:
-        # the camera has no real off switch for the setpoint, so it is set to 20 degC when disabling
-        value = setpoint if enabled and setpoint is not None else 20.0
+        # the camera has no real off switch for the setpoint, so it is set to the off temperature when disabling
+        # (or just above the sensor, if that is warmer, so that the cooler does not cool below ambient)
+        value = setpoint if enabled and setpoint is not None else await self._off_value()
 
         def _set() -> None:
             self._cam.set_cooling(enabled, value)
@@ -347,6 +348,15 @@ class SbigCamera(CoolingRampMixin, BaseCamera, ICamera, IWindow, IBinning, ICool
 
         # publish state (power unknown until next poll)
         await self.comm.set_state(ICooling, self._cooling_state(None, enabled, value))
+
+    async def _off_value(self) -> float:
+        """Setpoint that stands for "off": the off temperature, or just above the sensor if that is warmer."""
+        try:
+            _, temp, _, _ = await self._get_cooling_status()
+        except Exception as e:
+            log.warning("Could not read the sensor temperature for switching off: %s", e)
+            temp = None
+        return self._cooling_ramp.off_setpoint(temp)
 
     async def _get_cooling_status(self) -> tuple[bool, float, float, float]:
         def _get() -> tuple[bool, float, float, float]:
@@ -365,6 +375,7 @@ class SbigCamera(CoolingRampMixin, BaseCamera, ICamera, IWindow, IBinning, ICool
 
     async def _poll_cooling(self) -> None:
         """Background task: periodically reads cooling status and publishes ICooling and ITemperatures state."""
+        failed = False
         while True:
             try:
 
@@ -373,8 +384,14 @@ class SbigCamera(CoolingRampMixin, BaseCamera, ICamera, IWindow, IBinning, ICool
                 await self.comm.set_state(
                     ITemperatures, TemperaturesState(readings=[SensorReading(name="CCD", value=temp)])
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                if not failed:
+                    log.warning("Could not read the cooling status: %s", e)
+                failed = True
+            else:
+                if failed:
+                    log.info("Reading the cooling status works again.")
+                failed = False
             await asyncio.sleep(10)
 
 
