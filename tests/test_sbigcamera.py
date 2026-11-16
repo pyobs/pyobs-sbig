@@ -145,7 +145,7 @@ async def test_ramp_steps_down_from_hardware_setpoint() -> None:
 
 
 @pytest.mark.asyncio
-async def test_disable_warms_up_then_switches_off_with_20_degrees() -> None:
+async def test_disable_warms_up_then_switches_off_with_off_value() -> None:
     camera = make_cooling_camera()
     await camera.set_cooling(False, 0.0)
 
@@ -156,5 +156,31 @@ async def test_disable_warms_up_then_switches_off_with_20_degrees() -> None:
 
     calls = camera._cam.set_cooling.call_args_list  # type: ignore[attr-defined]
     assert calls[0].args == (True, -9.0)  # raised step by step first
-    assert calls[-1].args == (False, 20.0)
+    assert calls[-1].args == (False, 21.5)  # just above the sensor, which follows the setpoint to 20.5 degC
     assert not camera.cooling_ramping
+
+
+@pytest.mark.asyncio
+async def test_disable_with_warm_ambient_stays_above_sensor() -> None:
+    camera = make_cooling_camera(temp=24.0, setpoint=20.0)  # still at the off temperature, but ambient is warmer
+    await camera.set_cooling(False, 0.0)
+    for _ in range(100):
+        if not camera.cooling_ramping:
+            break
+        await camera._cooling_tick()
+
+    calls = camera._cam.set_cooling.call_args_list  # type: ignore[attr-defined]
+    assert calls[-1].args == (False, 25.0)  # not 20 degC, which would cool 4 K below ambient
+
+
+@pytest.mark.asyncio
+async def test_poll_cooling_logs_a_failure_once(caplog: pytest.LogCaptureFixture) -> None:
+    import asyncio
+    from unittest.mock import patch
+
+    camera = make_cooling_camera()
+    camera._cam.get_cooling.side_effect = RuntimeError("no camera")  # type: ignore[attr-defined]
+    with patch("pyobs_sbig.sbigcamera.asyncio.sleep", AsyncMock(side_effect=[None, None, asyncio.CancelledError()])):
+        with caplog.at_level("INFO"), pytest.raises(asyncio.CancelledError):
+            await camera._poll_cooling()
+    assert [r.levelname for r in caplog.records if "cooling status" in r.getMessage()] == ["WARNING"]
