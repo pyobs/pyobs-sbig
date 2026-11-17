@@ -9,6 +9,7 @@ Entries for releases before this file existed were generated from commit subject
 
 ## [Unreleased]
 
+- Closing the camera warms up first (pyobs-core `CoolingRampMixin`). The time limit `cooling_close_timeout` is now estimated from the current setpoint and `cooling_rate_warm` instead of a fixed 300 s, so a deeply cooled camera is warmed up completely before it is closed. Needs pyobs-core 2.28.0.
 - Switching cooling off sets the camera to the off temperature (20 degC by default) or, if the sensor is warmer than
   that, to just above the sensor, so that the cooler does not keep cooling below ambient. Errors when polling the
   cooling status are logged (once, until it works again) instead of being ignored. Needs pyobs-core 2.27.0.
