@@ -7,7 +7,6 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, TypeVar, cast
 
-import numpy as np
 from pyobs.images import Image
 from pyobs.interfaces import IAbortable, IBinning, ICamera, ICooling, ITemperatures, IWindow
 from pyobs.interfaces.IBinning import Binning, BinningCapabilities, BinningState
@@ -17,6 +16,7 @@ from pyobs.mixins import CoolingRampMixin
 from pyobs.modules.camera.basecamera import BaseCamera
 from pyobs.utils import exceptions as exc
 from pyobs.utils.enums import ExposureStatus
+from pyobs.utils.frameheader import FrameSettings, make_frame_header
 
 log = logging.getLogger(__name__)
 
@@ -290,24 +290,20 @@ class SbigCamera(CoolingRampMixin, BaseCamera, ICamera, IWindow, IBinning, ICool
 
                 # create FITS image and set header
                 img = Image(data)
-                img.header["DATE-OBS"] = (date_obs, "Date and time of start of exposure")
-                img.header["EXPTIME"] = (exposure_time, "Exposure time [s]")
-                img.header["DET-TEMP"] = (temp, "CCD temperature [C]")
-                img.header["DET-TSET"] = (setpoint, "Cooler setpoint [C]")
-                img.header["DET-COOL"] = (round(power * 100), "Cooler power [percent]")
-
-                # binning
-                img.header["XBINNING"] = img.header["DET-BIN1"] = (self._binning[0], "Binning factor used on X axis")
-                img.header["YBINNING"] = img.header["DET-BIN2"] = (self._binning[1], "Binning factor used on Y axis")
-
-                # window
-                img.header["XORGSUBF"] = (self._window[0], "Subframe origin on X axis")
-                img.header["YORGSUBF"] = (self._window[1], "Subframe origin on Y axis")
-
-                # statistics
-                img.header["DATAMIN"] = (float(np.min(data)), "Minimum data value")
-                img.header["DATAMAX"] = (float(np.max(data)), "Maximum data value")
-                img.header["DATAMEAN"] = (float(np.mean(data)), "Mean data value")
+                img.header.update(
+                    make_frame_header(
+                        FrameSettings(
+                            date_obs=date_obs,
+                            exposure_time=exposure_time,
+                            binning=self._binning,
+                            window=self._window,
+                            temperature=temp,
+                            setpoint=setpoint,
+                            cooler_power=round(power * 100),
+                            data=data,
+                        )
+                    )
+                )
 
                 # biassec/trimsec
                 self.set_biassec_trimsec(img.header, *self._full_frame)

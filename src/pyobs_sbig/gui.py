@@ -1,9 +1,13 @@
 import asyncio
 import sys
 import time
+from datetime import UTC, datetime
+from typing import Any
 
 import qasync  # type: ignore
 from astropy.io import fits
+from numpy.typing import NDArray
+from pyobs.utils.frameheader import FrameSettings, make_frame_header
 from pyobs.utils.gui.camera import (
     BinningWidget,
     DataDisplayWidget,
@@ -14,6 +18,48 @@ from pyobs.utils.gui.camera.windowingwidget import WindowingWidget
 from PySide6 import QtWidgets
 
 from .sbigudrv import SBIGCam, SBIGImg  # type: ignore
+
+
+def make_header(
+    cam: SBIGCam,
+    date_obs: datetime,
+    exposure_time: float,
+    window: tuple[int, int, int, int],
+    binning: tuple[int, int],
+    data: NDArray[Any],
+) -> fits.Header:
+    """Builds the FITS header for a frame, reading temperature and cooling from the camera (blocking).
+
+    Args:
+        cam: Camera to read the cooling from.
+        date_obs: UTC time the exposure was started.
+        exposure_time: Exposure time in seconds.
+        window: Left, top, width and height of the window in binned pixels, as the camera takes them.
+        binning: Binning in x and y.
+        data: The frame.
+
+    Returns:
+        The header.
+    """
+    _, temp, setpoint, power = cam.get_cooling()
+    return make_frame_header(
+        FrameSettings(
+            date_obs=date_obs,
+            exposure_time=exposure_time,
+            binning=binning,
+            # the camera takes the window in binned pixels, FITS wants unbinned ones
+            window=(
+                window[0] * binning[0],
+                window[1] * binning[1],
+                window[2] * binning[0],
+                window[3] * binning[1],
+            ),
+            temperature=temp,
+            setpoint=setpoint,
+            cooler_power=round(power * 100),
+            data=data,
+        )
+    )
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -64,9 +110,13 @@ class MainWindow(QtWidgets.QMainWindow):
         loop = asyncio.get_running_loop()
 
         # set exposure time, window and binning, then start the exposure off the Qt thread
+        date_obs = datetime.now(UTC)
+        exposure_time = self.exposure_time.value
+        window = self.window_widget.values
+
         def _start() -> None:
-            self._cam.exposure_time = self.exposure_time.value
-            self._cam.window = self.window_widget.values
+            self._cam.exposure_time = exposure_time
+            self._cam.window = window
             self._cam.binning = binning
             self._cam.start_exposure(self._img, False)
 
@@ -103,7 +153,10 @@ class MainWindow(QtWidgets.QMainWindow):
         data = self._img.data
 
         self.expose.set_exposures_left()
-        image = fits.PrimaryHDU(data)
+        header = await loop.run_in_executor(
+            None, make_header, self._cam, date_obs, exposure_time, window, binning, data
+        )
+        image = fits.PrimaryHDU(data, header=header)
         self.data_display_widget.set_data(image)
 
     @qasync.asyncSlot()  # type: ignore
