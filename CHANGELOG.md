@@ -9,17 +9,35 @@ Entries for releases before this file existed were generated from commit subject
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-17
+
 - The GUI writes a FITS header into the frames it saves (it was empty). `SbigCamera` and the GUI build the header cards
   with `make_frame_header` from pyobs-core, so key names and comments are the same everywhere. Needs pyobs-core 2.28.0.
 - Closing the camera warms up first (pyobs-core `CoolingRampMixin`). The time limit `cooling_close_timeout` is now estimated from the current setpoint and `cooling_rate_warm` instead of a fixed 300 s, so a deeply cooled camera is warmed up completely before it is closed. Needs pyobs-core 2.28.0.
+
+## [2.1.1] - 2026-11-16
+
 - Switching cooling off sets the camera to the off temperature (20 degC by default) or, if the sensor is warmer than
   that, to just above the sensor, so that the cooler does not keep cooling below ambient. Errors when polling the
   cooling status are logged (once, until it works again) instead of being ignored. Needs pyobs-core 2.27.0.
+
+## [2.1.0] - 2026-11-16
+
 - `SbigCamera` ramps the cooling setpoint with pyobs-core's `CoolingRampMixin` (needs pyobs-core 2.24.0).
   `set_cooling` returns at once and the setpoint is stepped in the background, including warming up before the
   cooler is switched off (the camera is then set to 20 degC, as before). Rates and step are set with
   `cooling_rate_warm` (default 1 degC/min), `cooling_rate_cool` (default 2 degC/min) and `cooling_ramp_step`.
   Before, the setpoint was set in one step.
+
+## [2.0.6] - 2026-10-04
+
+- Put the email on the copyright line of `LICENSE`, so that GitHub detects the MIT license.
+- Dependency updates.
+
+## [2.0.5] - 2026-10-04
+
+- Added `CONTRIBUTING.md` and this changelog, and the readme and project URLs to the package metadata.
+- Dependency updates.
 
 ## [2.0.4] - 2026-09-28
 
